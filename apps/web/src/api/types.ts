@@ -25,3 +25,11 @@ export type AdapterCapabilities = Schemas["AdapterCapabilities"];
 
 export type Provenance = Instrument["provenance"];
 export type JobState = Job["state"];
+export type Stance = Thesis["stance"];
+export type Level = Schemas["Level"];
+export type TradePlan = Schemas["TradePlan"];
+export type RiskCalculation = Schemas["RiskCalculation"];
+export type Timeframe = Bar["timeframe"];
+export type SessionScope = TAFeature["session"];
+export type DetectorName = TAFeature["detector"];
+export type Direction = TAFeature["direction"];
