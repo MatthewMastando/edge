@@ -67,6 +67,8 @@ export type paths = {
         /**
          * Save Draft
          * @description Autosave the editable presentation. This does not create a revision.
+         *
+         *     An older clientUpdatedAt does not overwrite a newer draft.
          */
         put: operations["saveArtifactDraft"];
         post?: never;
@@ -86,7 +88,11 @@ export type paths = {
         /** List Revisions */
         get: operations["listArtifactRevisions"];
         put?: never;
-        post?: never;
+        /**
+         * Save Revision
+         * @description Persist an immutable user revision. This does not place or change an order.
+         */
+        post: operations["saveArtifactRevision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -238,6 +244,28 @@ export type paths = {
         };
         /** List Run Events */
         get: operations["listRunEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Run Features
+         * @description Features whose chart annotations were stored with this run.
+         *
+         *     The rows are the calc 1.0.0 features the thesis cites. Levels are not recomputed here.
+         */
+        get: operations["listRunFeatures"];
         put?: never;
         post?: never;
         delete?: never;
@@ -543,6 +571,13 @@ export type components = {
             client_message_id?: string | null;
             /** Conversation Id */
             conversation_id?: string | null;
+            /**
+             * Dispatch
+             * @description inline runs the job in this request. worker leaves it queued for the worker.
+             * @default inline
+             * @enum {string}
+             */
+            dispatch: "inline" | "worker";
             /**
              * Horizon
              * @default 2-5 sessions
@@ -1731,20 +1766,15 @@ export type components = {
             /**
              * Confirmation Time
              * @description Null while the feature is still pending.
-             * @default null
              */
-            confirmation_time: string | null;
+            confirmation_time?: string | null;
             /**
              * Confirmation Tz
              * @description Set exactly when ``confirmation_time`` is set.
-             * @default null
              */
-            confirmation_tz: string | null;
-            /**
-             * Contract Code
-             * @default null
-             */
-            contract_code: string | null;
+            confirmation_tz?: string | null;
+            /** Contract Code */
+            contract_code?: string | null;
             /**
              * Data Revision
              * @description Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.
@@ -2195,6 +2225,36 @@ export type components = {
              */
             retrieval_calls: number;
         };
+        /**
+         * UserRevisionBody
+         * @description User save. Numerical fields overlay the parent thesis; feature levels are left untouched.
+         */
+        UserRevisionBody: {
+            /**
+             * Base Revision Id
+             * Format: uuid
+             */
+            base_revision_id: string;
+            /** Contracts */
+            contracts?: number | null;
+            /** Entry */
+            entry?: string | null;
+            /** Estimated Costs */
+            estimated_costs?: string | null;
+            /** Invalidation */
+            invalidation?: string | null;
+            /** Presentation Markdown */
+            presentation_markdown: string;
+            /**
+             * Stance
+             * @enum {string}
+             */
+            stance: "bullish" | "bearish" | "neutral" | "insufficient_evidence";
+            /** Target */
+            target?: string | null;
+            /** Unset Reason */
+            unset_reason?: string | null;
+        };
         /** ValidationCheck */
         ValidationCheck: {
             /**
@@ -2414,6 +2474,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saveArtifactRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRevisionBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDetail"];
                 };
             };
             /** @description Validation Error */
@@ -2679,6 +2774,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunEvent"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listRunFeatures: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TAFeature"][];
                 };
             };
             /** @description Validation Error */

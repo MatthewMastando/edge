@@ -55,12 +55,26 @@ uv run trading-core fixtures verify
 # 5. Run the services (separate terminals)
 uv run trading-api serve --reload        # http://127.0.0.1:8000  (/health, /docs, /openapi.json)
 uv run trading-worker                    # add --once to poll a single time and exit
-pnpm dev                                 # http://127.0.0.1:5173
+pnpm dev                                 # http://127.0.0.1:5173  mock shell (MSW)
 ```
 
+`pnpm dev` is the local mock shell. Vite starts MSW, market routes are answered in the browser,
+and nothing calls the API. Drafts for that shell stay in the browser. Leave `VITE_USE_MSW` unset.
+
+The fixture path uses the API and worker with no paid credentials. Keep those two processes
+running, then start the web app against them:
+
+```bash
+VITE_USE_MSW=false pnpm dev              # http://127.0.0.1:5173 talks to the API
+pnpm --filter @trw/web exec playwright install chromium   # once
+pnpm --filter @trw/web test:e2e          # 6EZ6 through the API and worker
+```
+
+CI runs that same Playwright spec (`scripts/run_fixture_e2e.sh`) against Postgres, the fixture
+API, and the worker. It does not use provider credentials.
+
 Everything binds to localhost. In fixture mode with no `SUPABASE_JWT_SECRET` the API serves a
-local development user; any other configuration refuses unauthenticated requests until JWT
-verification lands in Stage 1B.
+local development user; any other configuration refuses unauthenticated requests.
 
 ## Tests and checks
 
@@ -71,6 +85,8 @@ uv run pytest                                       # unit + smoke tests
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres uv run pytest tests/smoke   # includes migrations on a fresh DB
 pnpm typecheck && pnpm lint && pnpm test            # web
 pnpm contracts:check                                # committed OpenAPI + TS types match the Python models
+# Playwright (API and worker already running, VITE_USE_MSW=false on the dev server):
+pnpm --filter @trw/web test:e2e
 ```
 
 The migration smoke test creates and drops a throwaway database, so `DATABASE_URL` must have

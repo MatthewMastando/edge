@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import threading
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
@@ -581,6 +583,105 @@ async def test_chat_streams_progress_and_drafts_do_not_rewrite_revisions(
         assert found.status_code == 200
         assert found.json()["artifacts"]
         assert found.json()["conversations"]
+
+
+def test_worker_dispatch_streams_until_the_worker_finishes(
+    research_db: str, generated_dir: Path, tmp_path: Path
+) -> None:
+    settings = ApiSettings(
+        mode="fixture",
+        fixtures_root=generated_dir,
+        database_url=research_db,
+        storage_root=tmp_path / "dispatch-api",
+        llm_recordings_root=FIXTURES_DIR / "recorded",
+        supabase_jwt_secret="",
+        timeout_seconds=120,
+    )
+    worker = build_worker(
+        WorkerSettings(
+            database_url=research_db,
+            fixtures_root=generated_dir,
+            llm_recordings_root=FIXTURES_DIR / "recorded",
+            storage_root=tmp_path / "dispatch-worker",
+            worker_id="dispatch-worker",
+        )
+    )
+    box: dict[str, object] = {}
+
+    def post() -> None:
+        try:
+            with TestClient(create_app(settings)) as http:
+                response = http.post(
+                    "/v1/chat",
+                    json={
+                        "message": "Research 6EZ6 on the fixture path.",
+                        "symbol": "6EZ6",
+                        "client_message_id": f"worker-{uuid.uuid4().hex[:8]}",
+                        "dispatch": "worker",
+                    },
+                )
+                box["status"] = response.status_code
+                box["text"] = response.text
+        except Exception as exc:
+            box["error"] = exc
+
+    thread = threading.Thread(target=post)
+    thread.start()
+    deadline = time.monotonic() + 20
+
+    async def wait_and_run() -> None:
+        database = Database(research_db)
+        try:
+            row: dict[str, object] | None = None
+            while time.monotonic() < deadline:
+                async with database.engine.begin() as conn:
+                    row = await fetch_one(
+                        conn,
+                        """
+                        select id from jobs
+                        where state = 'queued'
+                          and kind = 'research'
+                          and payload->>'question' = 'Research 6EZ6 on the fixture path.'
+                        order by created_at desc
+                        limit 1
+                        """,
+                    )
+                if row is not None:
+                    break
+                await asyncio.sleep(0.05)
+            else:
+                msg = "worker dispatch did not enqueue a job"
+                raise AssertionError(msg)
+            job_id = row["id"]
+            if not isinstance(job_id, UUID):
+                msg = "queued job id was not a UUID"
+                raise AssertionError(msg)
+            async with database.engine.begin() as conn:
+                leased = await jobs.lease_job(
+                    conn,
+                    job_id=job_id,
+                    worker_id="dispatch-worker",
+                    lease_seconds=120,
+                )
+            if leased is None:
+                msg = "worker dispatch job could not be leased"
+                raise AssertionError(msg)
+            await worker.run_leased(leased)
+        finally:
+            await database.dispose()
+            await worker.close()
+
+    asyncio.run(wait_and_run())
+    thread.join(30)
+    assert not thread.is_alive()
+    assert box.get("error") is None
+    assert box.get("status") == 200
+    body = box.get("text")
+    assert isinstance(body, str)
+    assert "event: progress" in body
+    assert "deterministic_ta" in body
+    assert "event: done" in body
+    assert "artifact_id" in body
 
 
 def test_worker_once_drains_a_queued_research_job(
