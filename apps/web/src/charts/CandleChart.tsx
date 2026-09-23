@@ -54,17 +54,20 @@ export function CandleChart({
     const colors = chartPalette(host);
     const chart: IChartApi = createChart(host, {
       autoSize: true,
-      height: 460,
+      height: 640,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textDim,
-        fontFamily: "Segoe UI, Helvetica Neue, system-ui, sans-serif",
+        fontFamily: getComputedStyle(host).fontFamily,
       },
       grid: {
         vertLines: { color: colors.grid },
         horzLines: { color: colors.grid },
       },
-      rightPriceScale: { borderColor: colors.border },
+      rightPriceScale: {
+        borderColor: colors.border,
+        scaleMargins: { top: 0.14, bottom: 0.1 },
+      },
       timeScale: { borderColor: colors.border, timeVisible: true, secondsVisible: false },
       localization: {
         timeFormatter: (time: Time) => {
@@ -156,6 +159,7 @@ export function CandleChart({
                 onSelect(annotation.id);
               }}
             >
+              <span className={`swatch swatch-${annotation.direction}`} aria-hidden="true" />
               {annotation.label}
             </button>
           </div>

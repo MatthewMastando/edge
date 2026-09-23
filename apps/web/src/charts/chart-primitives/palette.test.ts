@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { chartPalette } from "./palette";
 
 describe("chartPalette", () => {
-  it("uses the shell text color for labels so light mode stays readable", () => {
+  it("uses the shell text color for labels so they stay readable on the chart", () => {
     const host = document.createElement("div");
     host.style.setProperty("--text", "#1d1b17");
     host.style.setProperty("--text-dim", "#5e584e");

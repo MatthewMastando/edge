@@ -11,10 +11,7 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <div>
-        <p className="eyebrow">Trading research</p>
-        <p className="top-title">{onWorkspace ? (artifact?.title ?? "Workspace") : pageTitle(pathname)}</p>
-      </div>
+      <p className="top-title">{onWorkspace ? (artifact?.title ?? "Workspace") : pageTitle(pathname)}</p>
       {onWorkspace ? (
         <div className="mode-pill" role="radiogroup" aria-label="Layout">
           <ModeOption mode="output" current={state.mode} onSelect={(mode) => { dispatch({ type: "setMode", mode }); }} />

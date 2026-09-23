@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Trading Research Workspace">
+  <rect width="32" height="32" rx="7" fill="#14161c"/>
+  <path d="M9 22.5V10" stroke="#e36d74" stroke-width="1.4" stroke-linecap="round"/>
+  <rect x="7.2" y="13" width="3.6" height="6.2" rx="0.4" fill="#e36d74"/>
+  <path d="M16 24.5V8" stroke="#3fbf86" stroke-width="1.4" stroke-linecap="round"/>
+  <rect x="14.2" y="12" width="3.6" height="8.2" rx="0.4" fill="#3fbf86"/>
+  <path d="M23 19.5V11" stroke="#d4b483" stroke-width="1.4" stroke-linecap="round"/>
+  <rect x="21.2" y="13.2" width="3.6" height="4.4" rx="0.4" fill="#d4b483"/>
+</svg>

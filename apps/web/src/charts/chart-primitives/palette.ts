@@ -23,27 +23,27 @@ export interface ChartPalette {
 }
 
 const FALLBACK: ChartPalette = {
-  text: "#eceae4",
-  textDim: "#b1ab9f",
-  grid: "#31363f",
-  border: "#4a5160",
-  up: "#8eae86",
-  down: "#c4847c",
-  accent: "#d7b07a",
-  accentInk: "#241c12",
-  zoneBull: "rgba(142, 174, 134, 0.22)",
-  zoneBullStroke: "#8eae86",
-  zoneBear: "rgba(196, 132, 124, 0.22)",
-  zoneBearStroke: "#c4847c",
-  level: "#d7b07a",
-  levelInk: "#241c12",
-  markerBull: "#8eae86",
-  markerBear: "#c4847c",
-  markerNeutral: "#d7b07a",
-  markerInk: "#14161c",
-  rsiLine: "#d7b07a",
-  rsiBand: "rgba(177, 171, 159, 0.85)",
-  label: "#eceae4",
+  text: "#e7ebf2",
+  textDim: "#b0b8c6",
+  grid: "#313846",
+  border: "#4a5366",
+  up: "#3fbf86",
+  down: "#e36d74",
+  accent: "#d4b483",
+  accentInk: "#1c160e",
+  zoneBull: "rgba(63, 191, 134, 0.22)",
+  zoneBullStroke: "#3fbf86",
+  zoneBear: "rgba(227, 109, 116, 0.22)",
+  zoneBearStroke: "#e36d74",
+  level: "#d4b483",
+  levelInk: "#1c160e",
+  markerBull: "#3fbf86",
+  markerBear: "#e36d74",
+  markerNeutral: "#d4b483",
+  markerInk: "#e7ebf2",
+  rsiLine: "#d4b483",
+  rsiBand: "rgba(176, 184, 198, 0.85)",
+  label: "#e7ebf2",
 };
 
 function withAlpha(color: string, alpha: number): string {
@@ -61,7 +61,7 @@ function readColor(style: CSSStyleDeclaration, name: string, fallback: string): 
   return value.length > 0 ? value : fallback;
 }
 
-/** Colors follow the shell theme so labels stay readable in light and dark. */
+/** Colors follow the shell theme so candles, zones, levels, markers, and RSI match the page. */
 export function chartPalette(element: Element): ChartPalette {
   const style = getComputedStyle(element);
   const text = readColor(style, "--text", FALLBACK.text);

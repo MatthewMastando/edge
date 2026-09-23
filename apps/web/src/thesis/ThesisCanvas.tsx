@@ -68,9 +68,12 @@ function OpenThesis({ artifact, draft }: { artifact: ArtifactRecord; draft: Draf
       <header className="thesis-head">
         <div>
           <h2 id="artifact-title">{artifact.title}</h2>
-          <p className="hint">
-            {artifact.thesis.symbol}
-            {artifact.thesis.contract_code ? ` · ${artifact.thesis.contract_code}` : ""} · {stanceLabel(shownStructured.stance)}
+          <p className="artifact-kicker">
+            <span className="num">
+              {artifact.thesis.symbol}
+              {artifact.thesis.contract_code ? ` · ${artifact.thesis.contract_code}` : ""}
+            </span>
+            <span className={`stance stance-${shownStructured.stance}`}>{stanceLabel(shownStructured.stance)}</span>
           </p>
         </div>
         <div className="row-actions">
