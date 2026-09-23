@@ -697,6 +697,62 @@
         "title": "CorrelatedMarket",
         "type": "object"
       },
+      "CsvColumnMapping": {
+        "additionalProperties": false,
+        "description": "Maps logical fill fields to CSV header names. Unmapped optional fields use defaults.",
+        "properties": {
+          "columns": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "symbol",
+                "side",
+                "quantity",
+                "price",
+                "fees",
+                "fill_time",
+                "currency",
+                "contract_code",
+                "venue",
+                "fill_tz"
+              ]
+            },
+            "title": "Columns",
+            "type": "object"
+          },
+          "default_currency": {
+            "default": "USD",
+            "maxLength": 8,
+            "title": "Default Currency",
+            "type": "string"
+          },
+          "default_fill_tz": {
+            "default": "America/New_York",
+            "maxLength": 64,
+            "title": "Default Fill Tz",
+            "type": "string"
+          },
+          "preset_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Name"
+          }
+        },
+        "required": [
+          "columns"
+        ],
+        "title": "CsvColumnMapping",
+        "type": "object"
+      },
       "DraftBody": {
         "additionalProperties": false,
         "properties": {
@@ -1255,6 +1311,605 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "ImportCommitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "csv_text": {
+            "maxLength": 2000000,
+            "title": "Csv Text",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 255,
+            "title": "Filename",
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/CsvColumnMapping"
+          }
+        },
+        "required": [
+          "filename",
+          "csv_text",
+          "mapping"
+        ],
+        "title": "ImportCommitRequest",
+        "type": "object"
+      },
+      "ImportCommitResult": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "duplicate_count": {
+            "title": "Duplicate Count",
+            "type": "integer"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "skipped_incomplete": {
+            "title": "Skipped Incomplete",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "imported_count",
+          "duplicate_count",
+          "skipped_incomplete",
+          "error_count"
+        ],
+        "title": "ImportCommitResult",
+        "type": "object"
+      },
+      "ImportPreset": {
+        "additionalProperties": false,
+        "properties": {
+          "mapping": {
+            "$ref": "#/components/schemas/CsvColumnMapping"
+          },
+          "name": {
+            "maxLength": 120,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "mapping"
+        ],
+        "title": "ImportPreset",
+        "type": "object"
+      },
+      "ImportPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "complete_count": {
+            "title": "Complete Count",
+            "type": "integer"
+          },
+          "duplicate_count": {
+            "title": "Duplicate Count",
+            "type": "integer"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "incomplete_count": {
+            "title": "Incomplete Count",
+            "type": "integer"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/CsvColumnMapping"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportPreviewRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "trusted_row_count": {
+            "description": "Rows that would be imported and count toward trusted P&L totals.",
+            "title": "Trusted Row Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "mapping",
+          "rows",
+          "row_count",
+          "complete_count",
+          "incomplete_count",
+          "duplicate_count",
+          "error_count",
+          "trusted_row_count"
+        ],
+        "title": "ImportPreview",
+        "type": "object"
+      },
+      "ImportPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "csv_text": {
+            "maxLength": 2000000,
+            "title": "Csv Text",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 255,
+            "title": "Filename",
+            "type": "string"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/CsvColumnMapping"
+          }
+        },
+        "required": [
+          "filename",
+          "csv_text",
+          "mapping"
+        ],
+        "title": "ImportPreviewRequest",
+        "type": "object"
+      },
+      "ImportPreviewRow": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Class"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Code"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees"
+          },
+          "fill_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Time"
+          },
+          "fill_tz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Tz"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "instrument_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Symbol"
+          },
+          "is_complete": {
+            "default": false,
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "is_duplicate": {
+            "default": false,
+            "title": "Is Duplicate",
+            "type": "boolean"
+          },
+          "issues": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ImportRowIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "multiplier": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiplier"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "enum": [
+                  "buy",
+                  "sell"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "source_row_hash": {
+            "title": "Source Row Hash",
+            "type": "string"
+          },
+          "source_row_number": {
+            "minimum": 1.0,
+            "title": "Source Row Number",
+            "type": "integer"
+          },
+          "symbol_raw": {
+            "title": "Symbol Raw",
+            "type": "string"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          }
+        },
+        "required": [
+          "source_row_number",
+          "source_row_hash",
+          "symbol_raw"
+        ],
+        "title": "ImportPreviewRow",
+        "type": "object"
+      },
+      "ImportRowIssue": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "enum": [
+                  "symbol",
+                  "side",
+                  "quantity",
+                  "price",
+                  "fees",
+                  "fill_time",
+                  "currency",
+                  "contract_code",
+                  "venue",
+                  "fill_tz"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source_row_number": {
+            "minimum": 1.0,
+            "title": "Source Row Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_row_number",
+          "severity",
+          "code",
+          "message"
+        ],
+        "title": "ImportRowIssue",
+        "type": "object"
+      },
+      "ImportedFillView": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Class"
+          },
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Code"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "fees": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Fees",
+            "type": "string"
+          },
+          "fill_time": {
+            "format": "date-time",
+            "title": "Fill Time",
+            "type": "string"
+          },
+          "fill_tz": {
+            "title": "Fill Tz",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "instrument_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Symbol"
+          },
+          "is_complete": {
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "multiplier": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multiplier"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "price": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Price",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "source_row_hash": {
+            "title": "Source Row Hash",
+            "type": "string"
+          },
+          "source_row_number": {
+            "title": "Source Row Number",
+            "type": "integer"
+          },
+          "source_row_raw": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Row Raw"
+          },
+          "symbol_raw": {
+            "title": "Symbol Raw",
+            "type": "string"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          }
+        },
+        "required": [
+          "id",
+          "batch_id",
+          "source_row_number",
+          "source_row_hash",
+          "symbol_raw",
+          "side",
+          "quantity",
+          "price",
+          "fees",
+          "currency",
+          "fill_time",
+          "fill_tz",
+          "is_complete"
+        ],
+        "title": "ImportedFillView",
+        "type": "object"
+      },
       "Instrument": {
         "additionalProperties": false,
         "description": "A tradable or researchable symbol. Futures roots and continuous series are instruments;\nindividual listed contracts are :class:`FuturesContract` rows that point back here.",
@@ -1596,6 +2251,226 @@
         "type": "object"
       },
       "JsonValue": {},
+      "KalshiEventBrief": {
+        "additionalProperties": false,
+        "properties": {
+          "event_summary": {
+            "title": "Event Summary",
+            "type": "string"
+          },
+          "fee_notes": {
+            "title": "Fee Notes",
+            "type": "string"
+          },
+          "is_demonstration": {
+            "default": false,
+            "description": "True when served from fixtures or when live Kalshi is unavailable.",
+            "title": "Is Demonstration",
+            "type": "boolean"
+          },
+          "no_scenario": {
+            "title": "No Scenario",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "settlement_rules": {
+            "title": "Settlement Rules",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/KalshiSourceRef"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "yes_scenario": {
+            "title": "Yes Scenario",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "title",
+          "event_summary",
+          "settlement_rules",
+          "yes_scenario",
+          "no_scenario",
+          "fee_notes",
+          "sources",
+          "provenance"
+        ],
+        "title": "KalshiEventBrief",
+        "type": "object"
+      },
+      "KalshiMarket": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "close_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Time"
+          },
+          "last_price": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Price"
+          },
+          "no_ask": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Ask"
+          },
+          "no_bid": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Bid"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          },
+          "yes_ask": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yes Ask"
+          },
+          "yes_bid": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yes Bid"
+          }
+        },
+        "required": [
+          "ticker",
+          "title",
+          "category",
+          "status",
+          "provenance"
+        ],
+        "title": "KalshiMarket",
+        "type": "object"
+      },
+      "KalshiSourceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "retrieved_at": {
+            "format": "date-time",
+            "title": "Retrieved At",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "url",
+          "retrieved_at"
+        ],
+        "title": "KalshiSourceRef",
+        "type": "object"
+      },
       "Level": {
         "additionalProperties": false,
         "description": "A named price produced by a detector (POC, VAH, zone bounds, swept level ...).",
@@ -2010,6 +2885,108 @@
           "usage"
         ],
         "title": "ModelResponse",
+        "type": "object"
+      },
+      "PresetList": {
+        "additionalProperties": false,
+        "properties": {
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/ImportPreset"
+            },
+            "title": "Presets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "presets"
+        ],
+        "title": "PresetList",
+        "type": "object"
+      },
+      "RealizedPnLLine": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Class"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Code"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "fees": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Fees",
+            "type": "string"
+          },
+          "fill_count": {
+            "title": "Fill Count",
+            "type": "integer"
+          },
+          "incomplete_fill_count": {
+            "default": 0,
+            "title": "Incomplete Fill Count",
+            "type": "integer"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "net_pnl": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Net Pnl",
+            "type": "string"
+          },
+          "realized_pnl": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Realized Pnl",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "symbol",
+          "currency",
+          "realized_pnl",
+          "fees",
+          "net_pnl",
+          "fill_count"
+        ],
+        "title": "RealizedPnLLine",
         "type": "object"
       },
       "RevisionDetail": {
@@ -2601,6 +3578,19 @@
           "message"
         ],
         "title": "RunEvent",
+        "type": "object"
+      },
+      "SavePresetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "preset": {
+            "$ref": "#/components/schemas/ImportPreset"
+          }
+        },
+        "required": [
+          "preset"
+        ],
+        "title": "SavePresetRequest",
         "type": "object"
       },
       "SearchResponse": {
@@ -3879,6 +4869,65 @@
         "title": "TradePlan",
         "type": "object"
       },
+      "TradingSummary": {
+        "additionalProperties": false,
+        "description": "Realized P&L from imported fills. No portfolio return without balances and cash flows.",
+        "properties": {
+          "has_account_snapshots": {
+            "default": false,
+            "title": "Has Account Snapshots",
+            "type": "boolean"
+          },
+          "incomplete_fill_count": {
+            "title": "Incomplete Fill Count",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/RealizedPnLLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "portfolio_return_available": {
+            "default": false,
+            "title": "Portfolio Return Available",
+            "type": "boolean"
+          },
+          "total_fees": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Total Fees",
+            "type": "string"
+          },
+          "total_net_pnl": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Total Net Pnl",
+            "type": "string"
+          },
+          "total_realized_pnl": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Total Realized Pnl",
+            "type": "string"
+          },
+          "trusted_fill_count": {
+            "title": "Trusted Fill Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lines",
+          "total_realized_pnl",
+          "total_fees",
+          "total_net_pnl",
+          "trusted_fill_count",
+          "incomplete_fill_count"
+        ],
+        "title": "TradingSummary",
+        "type": "object"
+      },
       "Usage": {
         "additionalProperties": false,
         "properties": {
@@ -4744,6 +5793,162 @@
         ]
       }
     },
+    "/v1/import/commit": {
+      "post": {
+        "operationId": "commitCsvImport",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportCommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportCommitResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit Csv Import",
+        "tags": [
+          "import"
+        ]
+      }
+    },
+    "/v1/import/presets": {
+      "get": {
+        "operationId": "listImportPresets",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Presets",
+        "tags": [
+          "import"
+        ]
+      }
+    },
+    "/v1/import/presets/{name}": {
+      "put": {
+        "operationId": "saveImportPreset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePresetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Preset",
+        "tags": [
+          "import"
+        ]
+      }
+    },
+    "/v1/import/preview": {
+      "post": {
+        "operationId": "previewCsvImport",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Import",
+        "tags": [
+          "import"
+        ]
+      }
+    },
     "/v1/instruments": {
       "get": {
         "operationId": "listInstruments",
@@ -4766,6 +5971,97 @@
         "summary": "List Instruments",
         "tags": [
           "market"
+        ]
+      }
+    },
+    "/v1/kalshi/markets": {
+      "get": {
+        "operationId": "listKalshiMarkets",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KalshiMarket"
+                  },
+                  "title": "Response Listkalshimarkets",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Markets",
+        "tags": [
+          "kalshi"
+        ]
+      }
+    },
+    "/v1/kalshi/markets/{ticker}/brief": {
+      "get": {
+        "operationId": "getKalshiEventBrief",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KalshiEventBrief"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Brief",
+        "tags": [
+          "kalshi"
         ]
       }
     },
@@ -5088,6 +6384,166 @@
         "summary": "List Snapshots",
         "tags": [
           "market"
+        ]
+      }
+    },
+    "/v1/trading/fills": {
+      "get": {
+        "operationId": "listImportedFills",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asset_class",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset Class"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrument_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "trusted_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Trusted Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportedFillView"
+                  },
+                  "title": "Response Listimportedfills",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Fills",
+        "tags": [
+          "trading"
+        ]
+      }
+    },
+    "/v1/trading/summary": {
+      "get": {
+        "operationId": "getTradingSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asset_class",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset Class"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrument_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Summary",
+        "tags": [
+          "trading"
         ]
       }
     }

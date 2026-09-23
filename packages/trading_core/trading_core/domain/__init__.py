@@ -68,6 +68,17 @@ from trading_core.domain.thesis import (
     ValidationCheck,
     ValidationResult,
 )
+from trading_core.domain.trading_records import (
+    CsvColumnMapping,
+    ImportCommitResult,
+    ImportedFillView,
+    ImportPreset,
+    ImportPreview,
+    KalshiEventBrief,
+    KalshiMarket,
+    RealizedPnLLine,
+    TradingSummary,
+)
 
 CONTRACT_MODELS: tuple[type[DomainModel], ...] = (
     Instrument,
@@ -99,6 +110,15 @@ CONTRACT_MODELS: tuple[type[DomainModel], ...] = (
     Run,
     RunEvent,
     FixtureLabel,
+    CsvColumnMapping,
+    ImportCommitResult,
+    ImportPreset,
+    ImportPreview,
+    ImportedFillView,
+    KalshiEventBrief,
+    KalshiMarket,
+    RealizedPnLLine,
+    TradingSummary,
 )
 """Every model published through the API's OpenAPI document and generated into TypeScript."""
 

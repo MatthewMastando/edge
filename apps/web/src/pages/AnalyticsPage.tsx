@@ -1,10 +1,22 @@
 import { useState } from "react";
 
+import { useImportedFills, useTradingSummary } from "../api/queries";
 import { formatInstant, stanceLabel } from "../lib/format";
-import { provenanceLabel } from "../lib/provenance";
+import { formatDecimal, provenanceLabel } from "../lib/provenance";
 import { useWorkspace } from "../workspace/useWorkspace";
 
 type Panel = "trading" | "outcomes" | "agent";
+
+const FAMILIES = [
+  { id: "", label: "All families" },
+  { id: "fx_futures", label: "FX futures" },
+  { id: "metals_futures", label: "Metals futures" },
+  { id: "commodity_futures", label: "Commodity futures" },
+  { id: "index_futures", label: "Index futures" },
+  { id: "equity", label: "Equities" },
+  { id: "etf", label: "ETFs" },
+  { id: "crypto_spot", label: "Spot crypto" },
+];
 
 export function AnalyticsPage() {
   const { state } = useWorkspace();
@@ -46,12 +58,64 @@ function Tab({
 }
 
 function MyTrading() {
+  const [family, setFamily] = useState("");
+  const assetClass = family.length > 0 ? family : null;
+  const fills = useImportedFills(assetClass);
+  const summary = useTradingSummary(assetClass);
+
   return (
     <section aria-labelledby="my-trading">
       <h3 id="my-trading">My Trading</h3>
       <p className="hint">
-        No imported fills. CSV import starts under Integrations. Incomplete history is excluded from trusted totals, and this view will not fabricate portfolio returns without balances and cash flows.
+        Reconciled realized P&amp;L and fees from imported fills. Incomplete rows are excluded from trusted totals. Portfolio return is not shown without balances and cash flows.
       </p>
+
+      <div className="field-row">
+        <label htmlFor="family-filter">Instrument family</label>
+        <select
+          id="family-filter"
+          value={family}
+          onChange={(e) => {
+            setFamily(e.target.value);
+          }}
+        >
+          {FAMILIES.map((f) => (
+            <option key={f.id || "all"} value={f.id}>{f.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {summary.data ? (
+        <dl className="meta-grid summary-strip">
+          <div>
+            <dt>Realized P&amp;L</dt>
+            <dd className="num">{formatDecimal(summary.data.total_realized_pnl)}</dd>
+          </div>
+          <div>
+            <dt>Fees</dt>
+            <dd className="num">{formatDecimal(summary.data.total_fees)}</dd>
+          </div>
+          <div>
+            <dt>Net</dt>
+            <dd className="num">{formatDecimal(summary.data.total_net_pnl)}</dd>
+          </div>
+          <div>
+            <dt>Trusted fills</dt>
+            <dd className="num">{summary.data.trusted_fill_count}</dd>
+          </div>
+          {summary.data.incomplete_fill_count > 0 ? (
+            <div>
+              <dt>Incomplete (excluded)</dt>
+              <dd className="num">{summary.data.incomplete_fill_count}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      {summary.data && !summary.data.portfolio_return_available ? (
+        <p className="hint">Portfolio return unavailable — import account snapshots with cash flows to enable that view later.</p>
+      ) : null}
+
       <table>
         <thead>
           <tr>
@@ -61,12 +125,31 @@ function MyTrading() {
             <th>Price</th>
             <th>Fees</th>
             <th>When</th>
+            <th>Source row</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td colSpan={6}>No fills.</td>
-          </tr>
+          {fills.isLoading ? (
+            <tr><td colSpan={7}>Loading…</td></tr>
+          ) : null}
+          {fills.data && fills.data.length === 0 ? (
+            <tr><td colSpan={7}>No fills. Import CSV under Integrations.</td></tr>
+          ) : null}
+          {fills.data?.map((fill) => (
+            <tr key={fill.id} className={fill.is_complete ? "" : "row-flagged"}>
+              <td>
+                {fill.instrument_symbol ?? fill.symbol_raw}
+                {fill.contract_code ? ` ${fill.contract_code}` : ""}
+                {!fill.is_complete ? " (incomplete)" : ""}
+              </td>
+              <td>{fill.side}</td>
+              <td className="num">{formatDecimal(fill.quantity)}</td>
+              <td className="num">{formatDecimal(fill.price)}</td>
+              <td className="num">{formatDecimal(fill.fees)}</td>
+              <td>{formatInstant(fill.fill_time)}</td>
+              <td className="num">{fill.source_row_number}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </section>

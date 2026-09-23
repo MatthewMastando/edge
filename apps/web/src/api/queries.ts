@@ -45,6 +45,60 @@ export function useCapabilities() {
   });
 }
 
+export function useImportPresets() {
+  return useQuery({
+    queryKey: ["import-presets"],
+    queryFn: async () => unwrap(await api.GET("/v1/import/presets"), "Import presets"),
+  });
+}
+
+export function useImportedFills(assetClass: string | null) {
+  return useQuery({
+    queryKey: ["trading-fills", assetClass],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/trading/fills", {
+          params: { query: { asset_class: assetClass ?? undefined, limit: 500 } },
+        }),
+        "Imported fills",
+      ),
+  });
+}
+
+export function useTradingSummary(assetClass: string | null) {
+  return useQuery({
+    queryKey: ["trading-summary", assetClass],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/trading/summary", {
+          params: { query: { asset_class: assetClass ?? undefined } },
+        }),
+        "Trading summary",
+      ),
+  });
+}
+
+export function useKalshiMarkets() {
+  return useQuery({
+    queryKey: ["kalshi-markets"],
+    queryFn: async () => unwrap(await api.GET("/v1/kalshi/markets"), "Kalshi markets"),
+  });
+}
+
+export function useKalshiBrief(ticker: string | null) {
+  return useQuery({
+    queryKey: ["kalshi-brief", ticker],
+    enabled: ticker !== null,
+    queryFn: async () => {
+      if (!ticker) throw new Error("Ticker required");
+      return unwrap(
+        await api.GET("/v1/kalshi/markets/{ticker}/brief", { params: { path: { ticker } } }),
+        "Kalshi brief",
+      );
+    },
+  });
+}
+
 export function useBars(symbol: string | null, timeframe: Timeframe = "5m") {
   return useQuery({
     queryKey: ["bars", symbol, timeframe],
