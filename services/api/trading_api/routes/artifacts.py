@@ -222,7 +222,7 @@ async def save_draft(
 ) -> DraftResponse:
     """Autosave the editable presentation. This does not create a revision.
 
-    A slower request for an older ``clientUpdatedAt`` does not overwrite a newer draft.
+    An older clientUpdatedAt does not overwrite a newer draft.
     """
     async with database.engine.begin() as conn:
         await _owned(conn, artifact_id, user.id)

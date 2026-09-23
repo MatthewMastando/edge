@@ -4302,7 +4302,7 @@
         ]
       },
       "put": {
-        "description": "Autosave the editable presentation. This does not create a revision.",
+        "description": "Autosave the editable presentation. This does not create a revision.\n\nAn older clientUpdatedAt does not overwrite a newer draft.",
         "operationId": "saveArtifactDraft",
         "parameters": [
           {

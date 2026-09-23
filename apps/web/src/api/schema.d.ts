@@ -67,6 +67,8 @@ export type paths = {
         /**
          * Save Draft
          * @description Autosave the editable presentation. This does not create a revision.
+         *
+         *     An older clientUpdatedAt does not overwrite a newer draft.
          */
         put: operations["saveArtifactDraft"];
         post?: never;
