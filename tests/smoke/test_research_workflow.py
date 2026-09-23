@@ -25,18 +25,20 @@ from trading_api.main import create_app
 from trading_api.settings import ApiSettings
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.domain.jobs import Job
+from trading_core.domain.thesis import Thesis
+from trading_core.harness.annotations import annotation_id_for, calculations_from_rows
 from trading_core.harness.budget import BudgetExceededError, BudgetService
 from trading_core.harness.checkpoints import ResearchCheckpoint
 from trading_core.harness.deps import AfterStage, ResearchPayload, WorkflowDeps
 from trading_core.harness.errors import SuspendWorkflowError
-from trading_core.harness.factory import load_model_provider
+from trading_core.harness.factory import load_detectors, load_model_provider
 from trading_core.harness.limits import ResearchLimits
 from trading_core.harness.runner import run_leased_job
+from trading_core.harness.validation import validate_thesis
 from trading_core.storage.db import Database, fetch_one
 from trading_core.storage.local import LocalParquetStore
-from trading_core.storage.repositories import analytics, jobs
+from trading_core.storage.repositories import analytics, jobs, market
 from trading_core.storage.repositories.common import as_int
-from trading_core.ta import DetectorRegistry
 from trading_worker.main import build_worker
 from trading_worker.settings import WorkerSettings
 
@@ -120,7 +122,7 @@ def _deps(
             model=None,
         ),
         store=LocalParquetStore(tmp_path / worker_id),
-        detectors=DetectorRegistry(),
+        detectors=load_detectors(),
         limits=limits or _limits(),
         worker_id=worker_id,
         lease_seconds=60,
@@ -242,7 +244,8 @@ async def test_recorded_workflow_resumes_without_duplicate_artifacts(
     assert thesis.get("provenance") == "recorded"
     assert "presentation_markdown" in thesis
     stubs = finished.checkpoint.get("stub_detectors")
-    assert isinstance(stubs, list) and "order_block" in stubs
+    assert stubs == []
+    await _assert_saved_calculations(engine, finished.checkpoint["thesis"])
 
     async with engine.begin() as conn:
         revisions = await fetch_one(
@@ -464,6 +467,12 @@ async def test_chat_streams_progress_and_drafts_do_not_rewrite_revisions(
         assert structured["stance"] == "insufficient_evidence"
         assert structured["presentation_markdown"] != ""
         assert "Demonstration" in detail.json()["presentation_markdown"]
+        assert "fvg 1.0.0" in detail.json()["presentation_markdown"]
+        database = Database(research_db)
+        try:
+            await _assert_saved_calculations(database.engine, structured)
+        finally:
+            await database.dispose()
 
         saved = http.put(
             f"/v1/artifacts/{artifact['id']}/draft",
@@ -512,11 +521,67 @@ def test_worker_once_drains_a_queued_research_job(
         async with database.engine.begin() as conn:
             stored = await jobs.get_job(conn, job.id)
         assert stored is not None and stored.state == "completed"
+        await _assert_saved_calculations(database.engine, stored.checkpoint["thesis"])
         await database.dispose()
         await worker.close()
         return stored.state
 
     assert asyncio.run(scenario()) == "completed"
+
+
+async def _assert_saved_calculations(engine: AsyncEngine, thesis_raw: object) -> None:
+    """Reopened thesis figures and chart annotations are the saved calc 1.0.0 features."""
+    thesis = Thesis.model_validate(thesis_raw)
+    assert thesis.is_demonstration is True
+    assert thesis.provenance == "recorded"
+    assert thesis.validation.passed is True
+    assert thesis.validation.repair_attempted is False
+    assert thesis.technical_findings
+    for name in (
+        "volume_profile",
+        "fvg",
+        "liquidity_sweep",
+        "bos",
+        "order_block",
+        "rsi_divergence",
+    ):
+        assert thesis.versions.tool_versions.get(name) == "1.0.0"
+    feature_ids = [item.feature_id for item in thesis.technical_findings]
+    async with engine.begin() as conn:
+        rows = await market.feature_calculation_rows(conn, feature_ids)
+        levels = await market.feature_levels(conn, feature_ids)
+        known = await market.list_feature_ids(conn, feature_ids)
+        events = await fetch_one(
+            conn,
+            "select count(*) as n from ta_events where feature_id = any(cast(string_to_array(:ids, ',') as uuid[]))",
+            {"ids": ",".join(str(item) for item in feature_ids)},
+        )
+    calculations = calculations_from_rows(rows)
+    assert set(calculations) == set(feature_ids)
+    assert len(rows) == len(set(feature_ids))
+    assert events is not None and as_int(events["n"]) > 0
+    for finding in thesis.technical_findings:
+        saved = calculations[finding.feature_id]
+        assert finding.annotation_id == annotation_id_for(finding.feature_id)
+        assert saved.annotation.id == finding.annotation_id
+        assert {level.price for level in saved.annotation.levels} == levels[finding.feature_id]
+        assert saved.calc_version == "1.0.0"
+    unsupported = thesis.model_copy(
+        update={"plan": thesis.plan.model_copy(update={"entry": Decimal("999999")})}
+    )
+    failed = validate_thesis(
+        unsupported,
+        known_feature_ids=known,
+        feature_levels=levels,
+        known_source_ids=set(),
+        known_excerpt_ids=set(),
+        tick_value=None,
+        point_value=None,
+        calculations=calculations,
+    )
+    assert failed.passed is False
+    numeric = next(check for check in failed.checks if check.name == "numeric_crosscheck")
+    assert numeric.passed is False
 
 
 def _conversation_id(body: str) -> str:

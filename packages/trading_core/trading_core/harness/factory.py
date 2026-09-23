@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from trading_core.harness.openai_stub import OpenAIResponsesProvider
 from trading_core.harness.recorded import RecordedProvider
+from trading_core.ta import DetectorRegistry, default_registry
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,3 +21,8 @@ def load_model_provider(*, provider: str, recordings_root: Path, model: str | No
     if not recordings_root.is_dir():
         return RecordedProvider([])
     return RecordedProvider.from_directory(recordings_root)
+
+
+def load_detectors() -> DetectorRegistry:
+    """Calc 1.0.0 detectors. An empty registry would stub every tool and invent no levels."""
+    return default_registry()

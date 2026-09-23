@@ -5,12 +5,11 @@ from __future__ import annotations
 from trading_api.settings import ApiSettings
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.harness.deps import WorkflowDeps
-from trading_core.harness.factory import load_model_provider
+from trading_core.harness.factory import load_detectors, load_model_provider
 from trading_core.harness.limits import ResearchLimits
 from trading_core.harness.secrets import secrets_from_environ
 from trading_core.storage.db import Database
 from trading_core.storage.local import LocalParquetStore
-from trading_core.ta import DetectorRegistry
 
 
 def research_limits(settings: ApiSettings) -> ResearchLimits:
@@ -42,7 +41,7 @@ def workflow_deps(
             model=settings.llm_model or None,
         ),
         store=LocalParquetStore(settings.storage_root),
-        detectors=DetectorRegistry(),
+        detectors=load_detectors(),
         limits=research_limits(settings),
         worker_id=worker_id,
         lease_seconds=max(int(settings.timeout_seconds), 60),

@@ -16,14 +16,13 @@ from typing import TYPE_CHECKING, Protocol
 
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.harness.deps import WorkflowDeps
-from trading_core.harness.factory import load_model_provider
+from trading_core.harness.factory import load_detectors, load_model_provider
 from trading_core.harness.limits import ResearchLimits
 from trading_core.harness.runner import run_leased_job
 from trading_core.harness.secrets import secrets_from_environ
 from trading_core.storage.db import Database
 from trading_core.storage.local import LocalParquetStore
 from trading_core.storage.repositories import jobs
-from trading_core.ta import DetectorRegistry
 from trading_worker import __version__
 from trading_worker.settings import WorkerSettings, get_settings
 
@@ -170,7 +169,7 @@ def build_worker(settings: WorkerSettings) -> Worker:
         adapter=adapter,
         provider=provider,
         store=LocalParquetStore(settings.storage_root),
-        detectors=DetectorRegistry(),
+        detectors=load_detectors(),
         limits=_limits(settings),
         worker_id=settings.effective_worker_id,
         lease_seconds=settings.effective_lease_seconds,

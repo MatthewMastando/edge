@@ -20,6 +20,7 @@ from trading_core.domain.thesis import (
     ValidationCheck,
     ValidationResult,
 )
+from trading_core.harness.annotations import annotation_id_for
 from trading_core.harness.deps import HARNESS_VERSION, PROMPT_VERSION
 from trading_core.harness.secrets import redact
 
@@ -41,17 +42,62 @@ def pending_validation() -> ValidationResult:
 
 def feature_summaries(raw_features: list[dict[str, JsonValue]]) -> list[FeatureReference]:
     findings: list[FeatureReference] = []
+    seen: set[UUID] = set()
     for item in raw_features:
         feature_id = item.get("id")
         detector = item.get("detector")
         direction = item.get("direction")
         if not isinstance(feature_id, str) or not isinstance(detector, str):
             continue
+        parsed = UUID(feature_id)
+        if parsed in seen:
+            continue
+        seen.add(parsed)
         label = detector if not isinstance(direction, str) else f"{detector} {direction}"
+        version = item.get("calc_version")
+        version_note = f" calc {version}" if isinstance(version, str) else ""
         findings.append(
-            FeatureReference(feature_id=UUID(feature_id), summary=f"Computed {label} feature.")
+            FeatureReference(
+                feature_id=parsed,
+                annotation_id=annotation_id_for(parsed),
+                summary=_summary(label, version_note, item.get("levels")),
+            )
         )
     return findings
+
+
+def _summary(label: str, version_note: str, levels: JsonValue) -> str:
+    text = f"Computed {label}{version_note} feature."
+    figures = _figures(levels)
+    if figures:
+        extra = " Levels: " + ", ".join(figures) + "."
+        if len(text) + len(extra) <= 1000:
+            text += extra
+    return text
+
+
+def _figures(levels: JsonValue) -> list[str]:
+    if not isinstance(levels, list):
+        return []
+    figures: list[str] = []
+    for level in levels:
+        if not isinstance(level, dict):
+            continue
+        name = level.get("name")
+        price = level.get("price")
+        if isinstance(name, str) and isinstance(price, str):
+            figures.append(f"{name} {price}")
+    return figures
+
+
+def tool_versions(raw_features: list[dict[str, JsonValue]]) -> dict[str, str]:
+    versions: dict[str, str] = {}
+    for item in raw_features:
+        detector = item.get("detector")
+        version = item.get("calc_version")
+        if isinstance(detector, str) and isinstance(version, str):
+            versions[detector] = version
+    return versions
 
 
 def assemble_thesis(
@@ -80,7 +126,11 @@ def assemble_thesis(
     stance = _stance(model_json.get("stance"))
     plan = _plan(model_json.get("plan"))
     findings = feature_summaries(feature_rows)
-    findings.extend(_model_findings(model_json.get("technical_findings")))
+    known = {item.feature_id for item in findings}
+    for extra in _model_findings(model_json.get("technical_findings")):
+        if extra.feature_id not in known:
+            findings.append(extra)
+            known.add(extra.feature_id)
     supporting, opposing = _model_evidence(model_json)
     missing = _strings(model_json.get("missing_data"))
     if stub_detectors:
@@ -117,6 +167,7 @@ def assemble_thesis(
         rationale=rationale,
         is_demonstration=is_demonstration,
         plan_unset=plan.unset_reason,
+        calculation_note=_calculation_note(tool_versions(feature_rows)),
     )
     return Thesis(
         id=thesis_id or uuid4(),
@@ -143,7 +194,7 @@ def assemble_thesis(
             provider=provider,
             prompt_version=PROMPT_VERSION,
             harness_version=HARNESS_VERSION,
-            tool_versions={},
+            tool_versions=tool_versions(feature_rows),
         ),
         validation=result,
         presentation_markdown=presentation,
@@ -163,6 +214,7 @@ def render_presentation(
     rationale: str,
     is_demonstration: bool,
     plan_unset: str | None,
+    calculation_note: str = "",
 ) -> str:
     contract = f" ({contract_code})" if contract_code else ""
     banner = ""
@@ -174,12 +226,19 @@ def render_presentation(
     unset = f"\n\nPlan unset: {plan_unset}" if plan_unset else ""
     return (
         f"{banner}# {symbol}{contract}\n\n"
-        f"**Stance:** {stance}\n\n"
+        f"**Stance:** {stance}{calculation_note}\n\n"
         f"{narrative}\n\n"
         f"## Context\n\n{macro}\n\n"
         f"## Uncertainty\n\n{uncertainty}\n\n"
         f"## Rationale\n\n{rationale}{unset}\n"
     )
+
+
+def _calculation_note(versions: dict[str, str]) -> str:
+    if not versions:
+        return ""
+    parts = [f"{name} {versions[name]}" for name in sorted(versions)]
+    return "\n\nCalculations: " + ", ".join(parts) + "."
 
 
 def _stance(value: JsonValue) -> Stance:

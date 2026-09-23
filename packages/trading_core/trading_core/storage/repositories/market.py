@@ -204,6 +204,39 @@ async def feature_levels(
     return {as_uuid(row["id"]): _level_prices(row["levels"]) for row in rows}
 
 
+async def feature_calculation_rows(
+    conn: AsyncConnection, feature_ids: list[UUID]
+) -> list[dict[str, object]]:
+    """Feature id, detector, calc version, levels and details for annotation checks."""
+    if not feature_ids:
+        return []
+    return await fetch_all(
+        conn,
+        """
+        select id, detector, calc_version, levels, details
+        from ta_features
+        where id = any(cast(string_to_array(:ids, ',') as uuid[]))
+        """,
+        {"ids": uuid_array(feature_ids)},
+    )
+
+
+async def list_snapshots(
+    conn: AsyncConnection, snapshot_ids: list[UUID]
+) -> list[dict[str, object]]:
+    if not snapshot_ids:
+        return []
+    return await fetch_all(
+        conn,
+        """
+        select id, kind, storage_key, timeframe, data_revision, provenance, contract_code
+        from market_snapshots
+        where id = any(cast(string_to_array(:ids, ',') as uuid[]))
+        """,
+        {"ids": uuid_array(snapshot_ids)},
+    )
+
+
 async def list_feature_ids(conn: AsyncConnection, feature_ids: list[UUID]) -> set[UUID]:
     if not feature_ids:
         return set()

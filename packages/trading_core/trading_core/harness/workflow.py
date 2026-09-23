@@ -19,9 +19,15 @@ from pydantic import JsonValue, ValidationError
 
 from trading_core.data.adapter import BarsRequest, TradesRequest, UnknownSymbolError
 from trading_core.domain.jobs import Job, JobState, RunStage, Usage
-from trading_core.domain.market import MarketSnapshot
-from trading_core.domain.ta import DetectorName, TAFeature
+from trading_core.domain.market import BarSeries, MarketSnapshot, TradeBatch
+from trading_core.domain.ta import DetectorName, TAEvent, TAFeature, TAFeatureTransition
 from trading_core.domain.thesis import Thesis
+from trading_core.harness.annotations import (
+    SavedCalculation,
+    annotation_id_for,
+    calculations_from_rows,
+    stamp_feature,
+)
 from trading_core.harness.budget import BudgetService
 from trading_core.harness.checkpoints import ResearchCheckpoint, dump_checkpoint
 from trading_core.harness.deps import (
@@ -39,15 +45,33 @@ from trading_core.harness.secrets import redact
 from trading_core.harness.thesis_builder import assemble_thesis
 from trading_core.harness.tools import ToolSession, build_research_registry
 from trading_core.harness.validation import attach_validation, repair_thesis, validate_thesis
+from trading_core.storage.base import ObjectNotFoundError
 from trading_core.storage.repositories import artifacts, jobs, market, reference, sources
+from trading_core.storage.repositories.common import as_str, as_uuid
 from trading_core.storage.repositories.conversations import insert_assistant_once
-from trading_core.storage.schemas import bars_to_table, trades_to_table
+from trading_core.storage.schemas import (
+    bars_to_table,
+    table_to_bars,
+    table_to_trades,
+    trades_to_table,
+)
 from trading_core.ta import Detector, DetectorInput, DetectorRegistry, InsufficientDataError
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
+
     from trading_core.domain.common import AssetClass, Provenance
 
 log = logging.getLogger("trading_core.harness.workflow")
+
+_DETECTORS = (
+    "volume_profile",
+    "fvg",
+    "liquidity_sweep",
+    "bos",
+    "order_block",
+    "rsi_divergence",
+)
 
 _ASSET_CLASSES = {
     "futures",
@@ -296,14 +320,7 @@ class ResearchWorkflow:
         summaries = list(checkpoint.feature_summaries)
         feature_ids = list(checkpoint.feature_ids)
         resolved = await self._deps.adapter.resolve(payload.symbol)
-        bars = await self._deps.adapter.get_bars(
-            BarsRequest(symbol=payload.symbol, timeframe=payload.timeframe, limit=5000)
-        )
-        trades = None
-        try:
-            trades = await self._deps.adapter.get_trades(TradesRequest(symbol=payload.symbol))
-        except UnknownSymbolError:
-            warnings.append("trades unavailable for deterministic TA")
+        bars, trades = await self._snapshot_series(checkpoint, instrument_id, payload)
         detector_input = DetectorInput(
             instrument=resolved.instrument.model_copy(update={"id": instrument_id}),
             contract=(
@@ -318,14 +335,7 @@ class ResearchWorkflow:
             snapshot_id=snapshot_id,
         )
         async with self._deps.engine.begin() as conn:
-            for name in (
-                "volume_profile",
-                "fvg",
-                "liquidity_sweep",
-                "bos",
-                "order_block",
-                "rsi_divergence",
-            ):
+            for name in _DETECTORS:
                 detector = _lookup(self._deps.detectors, name)
                 if detector is None:
                     stubs.append(name)
@@ -340,30 +350,18 @@ class ResearchWorkflow:
                 except InsufficientDataError as exc:
                     warnings.append(f"{name}: {exc}")
                     continue
-                for feature in output.features:
-                    stored = feature.model_copy(
-                        update={
-                            "instrument_id": instrument_id,
-                            "snapshot_id": snapshot_id,
-                            "contract_code": checkpoint.contract_code,
-                            "data_revision": checkpoint.data_revision or feature.data_revision,
-                        }
-                    )
-                    await market.insert_feature(conn, stored)
-                    feature_ids.append(stored.id)
-                    summaries.append(_summary(stored))
-                for event in output.events:
-                    await market.insert_event(
-                        conn,
-                        event.model_copy(
-                            update={
-                                "instrument_id": instrument_id,
-                                "contract_code": checkpoint.contract_code,
-                            }
-                        ),
-                    )
-                for transition in output.transitions:
-                    await market.insert_transition(conn, transition)
+                stored_ids, stored_summaries = await _persist_output(
+                    conn,
+                    features=output.features,
+                    events=output.events,
+                    transitions=output.transitions,
+                    instrument_id=instrument_id,
+                    snapshot_id=snapshot_id,
+                    contract_code=checkpoint.contract_code,
+                    data_revision=checkpoint.data_revision,
+                )
+                feature_ids.extend(stored_ids)
+                summaries.extend(stored_summaries)
             for raw in payload.fixture_features:
                 try:
                     feature = TAFeature.model_validate(raw)
@@ -379,9 +377,16 @@ class ResearchWorkflow:
                         "provenance": "fixture",
                     }
                 )
-                await market.insert_feature(conn, feature)
-                feature_ids.append(feature.id)
-                summaries.append(_summary(feature))
+                stamped = stamp_feature(feature)
+                await market.insert_feature(conn, stamped)
+                feature_ids.append(stamped.id)
+                summaries.append(_summary(stamped))
+        log.info(
+            "ta %s features=%d stubs=%s",
+            payload.symbol,
+            len(feature_ids),
+            ",".join(stubs) or "none",
+        )
         return checkpoint.model_copy(
             update={
                 "feature_ids": _unique_ids(feature_ids),
@@ -390,6 +395,59 @@ class ResearchWorkflow:
                 "warnings": warnings,
             }
         )
+
+    async def _snapshot_series(
+        self, checkpoint: ResearchCheckpoint, instrument_id: UUID, payload: ResearchPayload
+    ) -> tuple[BarSeries, TradeBatch | None]:
+        """Run TA on the captured parquet, not a second read of the adapter."""
+        async with self._deps.engine.begin() as conn:
+            rows = await market.list_snapshots(conn, checkpoint.snapshot_ids)
+        bars_id = _required_uuid(checkpoint.bars_snapshot_id, "snapshot")
+        bar_row = next((row for row in rows if as_uuid(row["id"]) == bars_id), None)
+        if bar_row is None:
+            msg = "bar snapshot row is missing"
+            raise RuntimeError(msg)
+        bar_key = as_str(bar_row["storage_key"])
+        try:
+            loaded = table_to_bars(self._deps.store.get_table(bar_key))
+        except ObjectNotFoundError as exc:
+            msg = f"bar snapshot {bar_key} is not in the object store"
+            raise RuntimeError(msg) from exc
+        if not loaded:
+            msg = f"bar snapshot {bar_key} is empty"
+            raise RuntimeError(msg)
+        revision = loaded[0].data_revision
+        if checkpoint.data_revision is not None and revision != checkpoint.data_revision:
+            msg = "bar snapshot data revision does not match the checkpoint"
+            raise RuntimeError(msg)
+        series = BarSeries(
+            instrument_id=instrument_id,
+            contract_code=checkpoint.contract_code,
+            timeframe=payload.timeframe,
+            data_revision=revision,
+            provenance=loaded[0].provenance,
+            bars=[bar.model_copy(update={"instrument_id": instrument_id}) for bar in loaded],
+        )
+        trade_row = next((row for row in rows if row.get("kind") == "trades"), None)
+        if trade_row is None:
+            return series, None
+        trade_key = as_str(trade_row["storage_key"])
+        try:
+            trades = table_to_trades(self._deps.store.get_table(trade_key))
+        except ObjectNotFoundError as exc:
+            msg = f"trade snapshot {trade_key} is not in the object store"
+            raise RuntimeError(msg) from exc
+        if trades and trades[0].data_revision != revision:
+            msg = "trade snapshot data revision does not match the bar snapshot"
+            raise RuntimeError(msg)
+        batch = TradeBatch(
+            instrument_id=instrument_id,
+            contract_code=checkpoint.contract_code,
+            data_revision=revision,
+            provenance=trades[0].provenance if trades else series.provenance,
+            trades=[trade.model_copy(update={"instrument_id": instrument_id}) for trade in trades],
+        )
+        return series, batch
 
     async def _gather(
         self, job: Job, checkpoint: ResearchCheckpoint, payload: ResearchPayload
@@ -583,11 +641,13 @@ class ResearchWorkflow:
 
     async def _validate(self, checkpoint: ResearchCheckpoint) -> ResearchCheckpoint:
         thesis = _thesis(checkpoint)
-        async with self._deps.engine.begin() as conn:
-            known_features = await market.list_feature_ids(conn, checkpoint.feature_ids)
-            levels = await market.feature_levels(conn, checkpoint.feature_ids)
-            known_sources = await sources.existing_source_ids(conn, checkpoint.source_ids)
-            known_excerpts = await sources.existing_excerpt_ids(conn, checkpoint.excerpt_ids)
+        (
+            known_features,
+            levels,
+            known_sources,
+            known_excerpts,
+            calculations,
+        ) = await self._validation_inputs(checkpoint)
         result = validate_thesis(
             thesis,
             known_feature_ids=known_features,
@@ -597,6 +657,7 @@ class ResearchWorkflow:
             tick_value=_decimal(checkpoint.tick_value),
             point_value=_decimal(checkpoint.point_value),
             repair_attempted=checkpoint.repair_attempted,
+            calculations=calculations,
         )
         updated = attach_validation(thesis, result)
         dumped = cast("dict[str, JsonValue]", updated.model_dump(mode="json"))
@@ -621,11 +682,13 @@ class ResearchWorkflow:
                 }
             )
         thesis = _thesis(checkpoint)
-        async with self._deps.engine.begin() as conn:
-            known_features = await market.list_feature_ids(conn, checkpoint.feature_ids)
-            levels = await market.feature_levels(conn, checkpoint.feature_ids)
-            known_sources = await sources.existing_source_ids(conn, checkpoint.source_ids)
-            known_excerpts = await sources.existing_excerpt_ids(conn, checkpoint.excerpt_ids)
+        (
+            known_features,
+            levels,
+            known_sources,
+            known_excerpts,
+            calculations,
+        ) = await self._validation_inputs(checkpoint)
         repaired = repair_thesis(
             thesis,
             known_feature_ids=known_features,
@@ -644,6 +707,7 @@ class ResearchWorkflow:
             tick_value=_decimal(checkpoint.tick_value),
             point_value=_decimal(checkpoint.point_value),
             repair_attempted=True,
+            calculations=calculations,
         )
         updated = attach_validation(repaired, result)
         dumped = cast("dict[str, JsonValue]", updated.model_dump(mode="json"))
@@ -817,6 +881,29 @@ class ResearchWorkflow:
             lines.append("none")
         lines.append("Do not invent prices, feature ids, or a trading edge.")
         return "\n".join(lines), truncated
+
+    async def _validation_inputs(
+        self, checkpoint: ResearchCheckpoint
+    ) -> tuple[
+        set[UUID],
+        dict[UUID, set[Decimal]],
+        set[UUID],
+        set[UUID],
+        dict[UUID, SavedCalculation],
+    ]:
+        async with self._deps.engine.begin() as conn:
+            known_features = await market.list_feature_ids(conn, checkpoint.feature_ids)
+            levels = await market.feature_levels(conn, checkpoint.feature_ids)
+            known_sources = await sources.existing_source_ids(conn, checkpoint.source_ids)
+            known_excerpts = await sources.existing_excerpt_ids(conn, checkpoint.excerpt_ids)
+            rows = await market.feature_calculation_rows(conn, checkpoint.feature_ids)
+        return (
+            known_features,
+            levels,
+            known_sources,
+            known_excerpts,
+            calculations_from_rows(rows),
+        )
 
     def _budget(self, checkpoint: ResearchCheckpoint, job: Job) -> BudgetService:
         return BudgetService(
@@ -1018,13 +1105,55 @@ def _unique_ids(values: list[UUID]) -> list[UUID]:
 def _summary(feature: TAFeature) -> dict[str, JsonValue]:
     return {
         "id": str(feature.id),
+        "annotation_id": annotation_id_for(feature.id),
         "detector": feature.detector,
+        "calc_version": feature.calc_version,
         "direction": feature.direction,
         "state": feature.state,
         "levels": [
-            {"name": level.name, "price": format(level.price, "f")} for level in feature.levels
+            {"name": level.name, "price": format(level.price, "f"), "role": level.role}
+            for level in feature.levels
         ],
     }
+
+
+async def _persist_output(
+    conn: AsyncConnection,
+    *,
+    features: list[TAFeature],
+    events: list[TAEvent],
+    transitions: list[TAFeatureTransition],
+    instrument_id: UUID,
+    snapshot_id: UUID,
+    contract_code: str | None,
+    data_revision: str | None,
+) -> tuple[list[UUID], list[dict[str, JsonValue]]]:
+    feature_ids: list[UUID] = []
+    summaries: list[dict[str, JsonValue]] = []
+    for feature in features:
+        stored = stamp_feature(
+            feature.model_copy(
+                update={
+                    "instrument_id": instrument_id,
+                    "snapshot_id": snapshot_id,
+                    "contract_code": contract_code,
+                    "data_revision": data_revision or feature.data_revision,
+                }
+            )
+        )
+        await market.insert_feature(conn, stored)
+        feature_ids.append(stored.id)
+        summaries.append(_summary(stored))
+    for event in events:
+        await market.insert_event(
+            conn,
+            event.model_copy(
+                update={"instrument_id": instrument_id, "contract_code": contract_code}
+            ),
+        )
+    for transition in transitions:
+        await market.insert_transition(conn, transition)
+    return feature_ids, summaries
 
 
 def _lookup(registry: DetectorRegistry, name: str) -> Detector | None:
