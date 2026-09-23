@@ -237,6 +237,37 @@ async def list_snapshots(
     )
 
 
+async def list_features(
+    conn: AsyncConnection,
+    feature_ids: list[UUID],
+    *,
+    detectors: list[str],
+    limit: int,
+) -> list[dict[str, object]]:
+    """Saved feature rows for chart annotations. Prices stay the persisted levels."""
+    if not feature_ids or not detectors or limit < 1:
+        return []
+    return await fetch_all(
+        conn,
+        """
+        select id, detector, calc_version, instrument_id, contract_code, timeframe, session,
+               session_calendar_id, session_calendar_version, direction, state, origin_time,
+               origin_tz, confirmation_time, confirmation_tz, as_of, as_of_tz, levels,
+               parameters, details, warnings, snapshot_id, data_revision, provenance
+        from ta_features
+        where id = any(cast(string_to_array(:ids, ',') as uuid[]))
+          and detector = any(cast(string_to_array(:detectors, ',') as text[]))
+        order by confirmation_time desc nulls last, origin_time desc
+        limit :limit
+        """,
+        {
+            "ids": uuid_array(feature_ids),
+            "detectors": ",".join(detectors),
+            "limit": limit,
+        },
+    )
+
+
 async def list_feature_ids(conn: AsyncConnection, feature_ids: list[UUID]) -> set[UUID]:
     if not feature_ids:
         return set()

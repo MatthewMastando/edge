@@ -541,6 +541,16 @@
             ],
             "title": "Conversation Id"
           },
+          "dispatch": {
+            "default": "inline",
+            "description": "inline runs the job in this request. worker leaves it queued for the worker.",
+            "enum": [
+              "inline",
+              "worker"
+            ],
+            "title": "Dispatch",
+            "type": "string"
+          },
           "horizon": {
             "default": "2-5 sessions",
             "maxLength": 64,
@@ -2976,7 +2986,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Null while the feature is still pending.",
             "title": "Confirmation Time"
           },
@@ -2997,7 +3006,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Set exactly when ``confirmation_time`` is set.",
             "title": "Confirmation Tz"
           },
@@ -3010,7 +3018,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Contract Code"
           },
           "data_revision": {
@@ -3917,6 +3924,116 @@
         "title": "Usage",
         "type": "object"
       },
+      "UserRevisionBody": {
+        "additionalProperties": false,
+        "description": "User save. Numerical fields overlay the parent thesis; feature levels are left untouched.",
+        "properties": {
+          "base_revision_id": {
+            "format": "uuid",
+            "title": "Base Revision Id",
+            "type": "string"
+          },
+          "contracts": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contracts"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "estimated_costs": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Costs"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
+          },
+          "presentation_markdown": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Presentation Markdown",
+            "type": "string"
+          },
+          "stance": {
+            "enum": [
+              "bullish",
+              "bearish",
+              "neutral",
+              "insufficient_evidence"
+            ],
+            "title": "Stance",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "unset_reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unset Reason"
+          }
+        },
+        "required": [
+          "base_revision_id",
+          "presentation_markdown",
+          "stance"
+        ],
+        "title": "UserRevisionBody",
+        "type": "object"
+      },
       "ValidationCheck": {
         "additionalProperties": false,
         "properties": {
@@ -4291,6 +4408,58 @@
           }
         },
         "summary": "List Revisions",
+        "tags": [
+          "artifacts"
+        ]
+      },
+      "post": {
+        "description": "Persist an immutable user revision. This does not place or change an order.",
+        "operationId": "saveArtifactRevision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRevisionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Revision",
         "tags": [
           "artifacts"
         ]
@@ -4751,6 +4920,66 @@
           }
         },
         "summary": "List Run Events",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/v1/runs/{run_id}/features": {
+      "get": {
+        "description": "Features whose chart annotations were stored with this run.\n\nThe rows are the calc 1.0.0 features the thesis cites. Levels are not recomputed here.",
+        "operationId": "listRunFeatures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 80,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TAFeature"
+                  },
+                  "title": "Response Listrunfeatures",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Run Features",
         "tags": [
           "runs"
         ]

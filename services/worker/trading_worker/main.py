@@ -87,6 +87,14 @@ class Worker:
     def request_stop(self) -> None:
         self._stop.set()
 
+    async def run_leased(self, job: Job) -> None:
+        """Run one job that the caller already leased. Does not scan the queue."""
+        handler = self._registry.get(job.kind)
+        if handler is None:
+            msg = f"no handler registered for {job.kind}"
+            raise RuntimeError(msg)
+        await handler.run(job)
+
     async def poll_once(self) -> int:
         """Lease and run at most one job. Returns 1 when a job was taken."""
         self.iterations += 1

@@ -1,6 +1,9 @@
 import { useCallback, useState } from "react";
 
 import { useBars, useCapabilities, useInstruments } from "../api/queries";
+import { shouldUseMocks } from "../mocks/mode";
+import { saveUserRevision } from "../research/fixture";
+import { selectChartFeatures } from "../charts/annotations";
 import { CandleChart } from "../charts/CandleChart";
 import { ResultMeta } from "../charts/ResultMeta";
 import { formatInstant, stanceLabel } from "../lib/format";
@@ -48,6 +51,7 @@ function OpenThesis({ artifact, draft }: { artifact: ArtifactRecord; draft: Draf
   const pendingKind = !viewing && base ? changeKindFor(base, draft) : null;
   const proposal = state.proposals.find((item) => item.artifactId === artifact.id && item.status === "pending");
   const resolved = state.proposals.find((item) => item.artifactId === artifact.id && item.status !== "pending");
+  const chartFeatures = selectChartFeatures(artifact.features);
   const label = provenanceLabel(artifact.thesis.provenance);
   const [tagDraft, setTagDraft] = useState("");
 
@@ -106,7 +110,13 @@ function OpenThesis({ artifact, draft }: { artifact: ArtifactRecord; draft: Draf
               type="button"
               disabled={pendingKind === null}
               onClick={() => {
-                dispatch({ type: "saveRevision", artifactId: artifact.id });
+                if (shouldUseMocks()) {
+                  dispatch({ type: "saveRevision", artifactId: artifact.id });
+                  return;
+                }
+                void saveUserRevision(artifact.id, draft).then((revision) => {
+                  if (revision) dispatch({ type: "applyRemoteRevision", revision });
+                });
               }}
             >
               {pendingKind === "structured_edit" ? "Save structured revision" : "Save narrative revision"}
@@ -172,7 +182,7 @@ function OpenThesis({ artifact, draft }: { artifact: ArtifactRecord; draft: Draf
 
       <StructuredBlock
         draft={shownStructured}
-        features={artifact.features}
+        features={chartFeatures}
         instrument={instrument}
         readOnly={viewing !== null}
         onChange={(patch) => {
@@ -209,7 +219,7 @@ function OpenThesis({ artifact, draft }: { artifact: ArtifactRecord; draft: Draf
       {bars.isError ? <p role="alert">Bars are unavailable. Annotations still describe the saved calculations.</p> : null}
       <CandleChart
         bars={bars.data?.bars ?? []}
-        features={artifact.features}
+        features={chartFeatures}
         provenance={bars.data?.provenance ?? snapshot?.provenance ?? null}
         selectedId={state.selectedAnnotationId}
         onSelect={onSelectAnnotation}

@@ -251,6 +251,103 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return resolveProposal(state, action.id, "rejected", action.now);
     case "viewRevision":
       return { ...state, viewingRevisionId: action.id };
+    case "appendChat":
+      return {
+        ...state,
+        conversations: state.conversations.map((conversation) => {
+          if (conversation.id !== action.conversationId) return conversation;
+          const last = conversation.messages.at(-1);
+          if (last && last.role === action.message.role && last.content === action.message.content) return conversation;
+          return { ...conversation, messages: [...conversation.messages, action.message] };
+        }),
+      };
+    case "renameConversation":
+      return {
+        ...state,
+        activeConversationId: state.activeConversationId === action.from ? action.to : state.activeConversationId,
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === action.from
+            ? { ...conversation, id: action.to, title: action.title ?? conversation.title }
+            : conversation,
+        ),
+        artifacts: state.artifacts.map((artifact) =>
+          artifact.conversationId === action.from ? { ...artifact, conversationId: action.to } : artifact,
+        ),
+      };
+    case "restoreSaved": {
+      if (state.artifacts.length > 0 || action.artifacts.length === 0) return state;
+      const conversationId = action.conversationId;
+      return {
+        ...state,
+        artifacts: action.artifacts,
+        revisions: action.revisions,
+        drafts: action.drafts,
+        runs: action.runs,
+        selectedArtifactId: action.selectedArtifactId,
+        activeConversationId: conversationId ?? state.activeConversationId,
+        conversations: state.conversations.map((conversation) => {
+          if (!conversationId || (conversation.id !== "local-fixture" && conversation.id !== conversationId)) {
+            return conversation;
+          }
+          return {
+            ...conversation,
+            id: conversationId,
+            title: action.artifacts.find((artifact) => artifact.id === action.selectedArtifactId)?.title ?? conversation.title,
+            messages: action.messages.length > 0 ? action.messages : conversation.messages,
+          };
+        }),
+      };
+    }
+    case "openSavedArtifact": {
+      const artifact = action.artifact;
+      const conversationId = action.conversationId;
+      const active =
+        state.activeConversationId === "local-fixture" || state.activeConversationId === conversationId
+          ? conversationId
+          : state.activeConversationId;
+      return {
+        ...state,
+        artifacts: [artifact, ...state.artifacts.filter((item) => item.id !== artifact.id)],
+        revisions: [...state.revisions.filter((revision) => revision.artifactId !== artifact.id), ...action.revisions],
+        drafts: { ...state.drafts, [artifact.id]: action.draft },
+        runs: action.run ? [action.run, ...state.runs.filter((run) => run.id !== action.run?.id)] : state.runs,
+        selectedArtifactId: artifact.id,
+        selectedAnnotationId: null,
+        viewingRevisionId: null,
+        activeConversationId: active,
+        conversations: state.conversations.map((conversation) => {
+          if (conversation.id !== "local-fixture" && conversation.id !== conversationId) return conversation;
+          return {
+            ...conversation,
+            id: conversationId,
+            title: artifact.title,
+            attachment: { kind: "artifact", id: artifact.id, label: artifact.title },
+          };
+        }),
+      };
+    }
+    case "applyRemoteRevision": {
+      const revision = action.revision;
+      return {
+        ...state,
+        revisions: [...state.revisions.filter((item) => item.id !== revision.id), revision],
+        drafts: {
+          ...state.drafts,
+          [revision.artifactId]: {
+            artifactId: revision.artifactId,
+            baseRevisionId: revision.id,
+            structured: cloneStructured(revision.structured),
+            presentationMarkdown: revision.presentationMarkdown,
+            updatedAt: revision.createdAt,
+            saveState: "saved",
+          },
+        },
+        viewingRevisionId: null,
+        artifacts: state.artifacts.map((artifact) =>
+          artifact.id === revision.artifactId ? { ...artifact, updatedAt: revision.createdAt } : artifact,
+        ),
+      };
+    }
     default:
       return state;
   }

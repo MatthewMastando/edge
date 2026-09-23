@@ -1,7 +1,13 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { provenanceLabel } from "../lib/provenance";
+import { shouldUseMocks } from "../mocks/mode";
+import { loadArtifactBundle, streamFixtureResearch } from "../research/fixture";
 import { useWorkspace } from "../workspace/useWorkspace";
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 
 export function ChatPanel() {
   const { state, dispatch } = useWorkspace();
@@ -9,6 +15,9 @@ export function ChatPanel() {
   const scroller = useRef<HTMLDivElement>(null);
   const seen = useRef({ id: conversation?.id ?? "", count: conversation?.messages.length ?? 0 });
   const [text, setText] = useState("");
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const live = !shouldUseMocks();
   const top = state.scroll.chat;
   const messageCount = conversation?.messages.length ?? 0;
 
@@ -28,19 +37,99 @@ export function ChatPanel() {
     if (element.scrollTop !== top) element.scrollTop = top;
   }, [conversation, dispatch, messageCount, state.mode, top]);
 
+  const startResearch = (message: string) => {
+    const question = message.trim();
+    if (!question || running || !conversation) return;
+    const originId = conversation.id;
+    setRunning(true);
+    setRunError(null);
+    dispatch({
+      type: "appendChat",
+      conversationId: originId,
+      message: {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: question,
+        createdAt: new Date().toISOString(),
+        provenance: null,
+      },
+    });
+    let bound = originId;
+    void streamFixtureResearch(
+      {
+        message: question,
+        conversationId: isUuid(originId) ? originId : null,
+        clientMessageId: `web-${crypto.randomUUID()}`,
+      },
+      (event) => {
+        if (event.conversation_id && bound !== event.conversation_id) {
+          dispatch({ type: "renameConversation", from: bound, to: event.conversation_id, title: "6EZ6 research" });
+          bound = event.conversation_id;
+        }
+        const demonstration = event.is_demonstration === true || event.event === "done" || event.event === "message";
+        dispatch({
+          type: "appendChat",
+          conversationId: bound,
+          message: {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: event.stage ? `${event.stage}: ${event.message}` : event.message,
+            createdAt: new Date().toISOString(),
+            provenance: demonstration ? "recorded" : null,
+          },
+        });
+        if (event.event === "done" && event.artifact_id) {
+          void loadArtifactBundle(event.artifact_id).then((bundle) => {
+            if (!bundle) return;
+            dispatch({
+              type: "openSavedArtifact",
+              artifact: bundle.artifact,
+              revisions: bundle.revisions,
+              draft: bundle.draft,
+              run: bundle.run,
+              conversationId: bundle.artifact.conversationId ?? bound,
+            });
+          });
+        }
+        if (event.event === "error") setRunError(event.message);
+      },
+    )
+      .catch((error: unknown) => {
+        setRunError(error instanceof Error ? error.message : "Research failed");
+      })
+      .finally(() => {
+        setRunning(false);
+      });
+  };
+
   if (!conversation) return <p className="hint">No conversation.</p>;
 
   return (
     <section className="chat" aria-label="Conversation">
       <header className="chat-head">
-        <h2>{conversation.title}</h2>
-        {conversation.attachment ? (
-          <p className="hint">
-            Context: {conversation.attachment.kind} · {conversation.attachment.label}
-          </p>
-        ) : (
-          <p className="hint">No attachment. You can start a new chat with an instrument, watchlist, or artifact.</p>
-        )}
+        <div>
+          <h2>{conversation.title}</h2>
+          {conversation.attachment ? (
+            <p className="hint">
+              Context: {conversation.attachment.kind} · {conversation.attachment.label}
+            </p>
+          ) : (
+            <p className="hint">No attachment. You can start a new chat with an instrument, watchlist, or artifact.</p>
+          )}
+        </div>
+        {live ? (
+          <button
+            type="button"
+            className="primary"
+            data-testid="run-6ez6"
+            disabled={running}
+            onClick={() => {
+              startResearch("Research 6EZ6 on the fixture path.");
+            }}
+          >
+            {running ? "Research running" : "Research 6EZ6"}
+          </button>
+        ) : null}
       </header>
       <div
         ref={scroller}
@@ -53,9 +142,12 @@ export function ChatPanel() {
       >
         {conversation.messages.length === 0 ? (
           <p className="hint">
-            New conversation. Replies in this shell are recorded demonstrations until the harness is connected.
+            {live
+              ? "Run fixture research for 6EZ6. Progress streams here. Nothing on this page can place an order."
+              : "New conversation. Replies in this shell are recorded demonstrations until the harness is connected."}
           </p>
         ) : null}
+        {runError ? <p role="alert">{runError}</p> : null}
         <ol>
           {conversation.messages.map((message) => {
             const label = message.provenance ? provenanceLabel(message.provenance) : null;
@@ -73,7 +165,8 @@ export function ChatPanel() {
         className="composer"
         onSubmit={(event) => {
           event.preventDefault();
-          dispatch({ type: "sendMessage", text });
+          if (live) startResearch(text);
+          else dispatch({ type: "sendMessage", text });
           setText("");
         }}
       >
@@ -89,7 +182,7 @@ export function ChatPanel() {
             setText(event.target.value);
           }}
         />
-        <button type="submit" className="primary">
+        <button type="submit" className="primary" disabled={live && running}>
           Send
         </button>
       </form>

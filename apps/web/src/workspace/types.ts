@@ -142,4 +142,25 @@ export type WorkspaceAction =
   | { type: "removeTag"; artifactId: string; tag: string }
   | { type: "acceptProposal"; id: string; now?: string }
   | { type: "rejectProposal"; id: string; now?: string }
-  | { type: "viewRevision"; id: string | null };
+  | { type: "viewRevision"; id: string | null }
+  | { type: "appendChat"; conversationId: string; message: ChatMessage }
+  | { type: "renameConversation"; from: string; to: string; title?: string }
+  | {
+      type: "restoreSaved";
+      artifacts: ArtifactRecord[];
+      revisions: RevisionRecord[];
+      drafts: Record<string, DraftRecord>;
+      runs: Run[];
+      selectedArtifactId: string;
+      conversationId: string | null;
+      messages: ChatMessage[];
+    }
+  | {
+      type: "openSavedArtifact";
+      artifact: ArtifactRecord;
+      revisions: RevisionRecord[];
+      draft: DraftRecord;
+      run: Run | null;
+      conversationId: string;
+    }
+  | { type: "applyRemoteRevision"; revision: RevisionRecord };

@@ -48,10 +48,10 @@ export function StructuredBlock({
       <div className="level-readout">
         <h3>Calculated levels</h3>
         {features.length === 0 ? <p className="hint">No saved calculations.</p> : null}
-        <ul>
+        <ul data-testid="saved-levels">
           {features.flatMap((feature) =>
             feature.levels.map((level) => (
-              <li key={`${feature.id}-${level.name}`}>
+              <li key={`${feature.id}-${level.name}`} data-calc={feature.calc_version} data-saved-level={level.price}>
                 <span>{level.name}</span>
                 <span className="num">{formatDecimal(level.price)}</span>
               </li>

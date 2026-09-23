@@ -148,13 +148,15 @@ export function CandleChart({
         </div>
       ) : null}
       {!canDraw ? <p className="hint">The canvas chart renders in a browser. Annotations stay selectable below.</p> : null}
-      <div className="legend" role="list" aria-label="Annotations">
+      <div className="legend" role="list" aria-label="Annotations" data-testid="annotation-legend">
         {annotations.length === 0 ? <p className="hint">No saved calculations on this artifact.</p> : null}
         {annotations.map((annotation) => (
           <div key={annotation.id} role="listitem">
             <button
               type="button"
               className={annotation.id === selectedId ? "legend-item is-selected" : "legend-item"}
+              data-calc={annotation.calcVersion}
+              data-saved-level={annotation.savedPrice}
               onClick={() => {
                 onSelect(annotation.id);
               }}

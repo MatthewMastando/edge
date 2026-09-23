@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from trading_api.auth import UserDep
 from trading_api.dependencies import DatabaseDep
-from trading_core.domain.common import DomainModel
+from trading_core.domain.common import DecimalStr, DomainModel, Stance
+from trading_core.domain.thesis import RiskCalculation, Thesis
 from trading_core.storage.repositories import artifacts
 from trading_core.storage.repositories.common import (
     as_datetime,
@@ -59,6 +60,20 @@ class RevisionDetail(RevisionSummary):
     parent_revision_id: UUID | None = None
     run_id: UUID | None = None
     structured: dict[str, JsonValue]
+
+
+class UserRevisionBody(DomainModel):
+    """User save. Numerical fields overlay the parent thesis; feature levels are left untouched."""
+
+    base_revision_id: UUID
+    presentation_markdown: str = Field(min_length=1, max_length=100_000)
+    stance: Stance
+    entry: DecimalStr | None = None
+    invalidation: DecimalStr | None = None
+    target: DecimalStr | None = None
+    contracts: int | None = Field(default=None, ge=0)
+    estimated_costs: DecimalStr | None = None
+    unset_reason: str | None = Field(default=None, max_length=2000)
 
 
 class DraftBody(DomainModel):
@@ -225,6 +240,129 @@ async def save_draft(
         presentation_markdown=as_str_or_none(row["presentation_markdown"]),
         updated_at=as_datetime(row["updated_at"]),
     )
+
+
+@router.post(
+    "/artifacts/{artifact_id}/revisions",
+    response_model=RevisionDetail,
+    operation_id="saveArtifactRevision",
+)
+async def save_revision(
+    artifact_id: UUID, body: UserRevisionBody, user: UserDep, database: DatabaseDep
+) -> RevisionDetail:
+    """Persist an immutable user revision. This does not place or change an order."""
+    async with database.engine.begin() as conn:
+        await _owned(conn, artifact_id, user.id)
+        if not await artifacts.lock_artifact(conn, artifact_id, user.id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+        parent = await artifacts.get_revision(conn, body.base_revision_id)
+        if parent is None or as_uuid(parent["artifact_id"]) != artifact_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+        thesis = Thesis.model_validate(as_json_dict(parent["structured"]))
+        structured_changed = _structured_changed(thesis, body)
+        narrative_changed = thesis.presentation_markdown != body.presentation_markdown
+        if not structured_changed and not narrative_changed:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nothing to save")
+        updated = _apply_user_edit(thesis, body)
+        change_kind = "structured_edit" if structured_changed else "narrative_edit"
+        structured = cast("dict[str, JsonValue]", updated.model_dump(mode="json"))
+        revision_id, number = await artifacts.insert_revision(
+            conn,
+            artifact_id=artifact_id,
+            parent_revision_id=body.base_revision_id,
+            run_id=None,
+            structured=structured,
+            presentation_markdown=updated.presentation_markdown,
+            change_kind=change_kind,
+            created_by="user",
+            is_demonstration=bool(parent["is_demonstration"]),
+            provenance=as_str(parent["provenance"]),
+        )
+        await artifacts.set_current_revision(conn, artifact_id, revision_id)
+        await artifacts.upsert_draft(
+            conn,
+            artifact_id=artifact_id,
+            base_revision_id=revision_id,
+            structured=_form_payload(body),
+            presentation_markdown=updated.presentation_markdown,
+        )
+        row = await artifacts.get_revision(conn, revision_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found")
+    return RevisionDetail(
+        id=revision_id,
+        artifact_id=artifact_id,
+        revision_number=number,
+        parent_revision_id=body.base_revision_id,
+        run_id=None,
+        structured=as_json_dict(row["structured"]),
+        presentation_markdown=as_str(row["presentation_markdown"]),
+        change_kind=change_kind,
+        created_by="user",
+        is_demonstration=bool(row["is_demonstration"]),
+        provenance=as_str(row["provenance"]),
+        created_at=as_datetime(row["created_at"]),
+    )
+
+
+def _structured_changed(thesis: Thesis, body: UserRevisionBody) -> bool:
+    plan = thesis.plan
+    risk = thesis.risk
+    contracts = None if risk is None else risk.contracts
+    costs = None if risk is None else risk.estimated_costs
+    return (
+        thesis.stance != body.stance
+        or plan.entry != body.entry
+        or plan.invalidation != body.invalidation
+        or plan.target != body.target
+        or (plan.unset_reason or None) != (body.unset_reason or None)
+        or contracts != body.contracts
+        or costs != body.estimated_costs
+    )
+
+
+def _apply_user_edit(thesis: Thesis, body: UserRevisionBody) -> Thesis:
+    plan = thesis.plan.model_copy(
+        update={
+            "entry": body.entry,
+            "invalidation": body.invalidation,
+            "target": body.target,
+            "unset_reason": body.unset_reason,
+        }
+    )
+    risk = thesis.risk
+    if risk is None and (body.contracts is not None or body.estimated_costs is not None):
+        risk = RiskCalculation(
+            account_currency="USD",
+            contracts=body.contracts,
+            estimated_costs=body.estimated_costs,
+        )
+    elif risk is not None:
+        risk = risk.model_copy(
+            update={"contracts": body.contracts, "estimated_costs": body.estimated_costs}
+        )
+    return thesis.model_copy(
+        update={
+            "stance": body.stance,
+            "plan": plan,
+            "risk": risk,
+            "presentation_markdown": body.presentation_markdown,
+        }
+    )
+
+
+def _form_payload(body: UserRevisionBody) -> dict[str, JsonValue]:
+    return {
+        "stance": body.stance,
+        "entry": None if body.entry is None else format(body.entry, "f"),
+        "invalidation": None if body.invalidation is None else format(body.invalidation, "f"),
+        "target": None if body.target is None else format(body.target, "f"),
+        "contracts": body.contracts,
+        "estimatedCosts": None
+        if body.estimated_costs is None
+        else format(body.estimated_costs, "f"),
+        "unsetReason": body.unset_reason or "",
+    }
 
 
 async def _owned(conn: AsyncConnection, artifact_id: UUID, owner_id: UUID) -> dict[str, object]:
