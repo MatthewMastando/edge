@@ -26,7 +26,9 @@ describe("layout preservation", () => {
     await user.type(entry, "1.1740");
 
     const chat = screen.getByTestId("chat-scroll");
+    const report = screen.getByTestId("report-scroll");
     holdScroll(chat, 140);
+    holdScroll(report, 220);
 
     expect(screen.getByText(/Is there a level to work with/)).toBeInTheDocument();
     expect(screen.getByTestId("workspace")).toHaveAttribute("data-mode", "output");
@@ -42,9 +44,13 @@ describe("layout preservation", () => {
     expect(screen.getByText(/Is there a level to work with/)).toBeInTheDocument();
     expect(screen.getByTestId("chat-scroll")).toHaveAttribute("data-scroll", "140");
     expect(screen.getByTestId("chat-scroll").scrollTop).toBe(140);
+    expect(screen.getByTestId("report-scroll")).toHaveAttribute("data-scroll", "220");
+    expect(screen.getByTestId("report-scroll").scrollTop).toBe(220);
+    expect(screen.getByRole("heading", { name: "6EZ6 session note" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "Output" }));
     expect(screen.getByRole("textbox", { name: "Entry" })).toHaveValue("1.1740");
     expect(screen.getByTestId("chat-scroll").scrollTop).toBe(140);
+    expect(screen.getByTestId("report-scroll").scrollTop).toBe(220);
   });
 });

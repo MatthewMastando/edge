@@ -1,7 +1,8 @@
 import type { UTCTimestamp } from "lightweight-charts";
 
 import type { HitBox } from "./geometry";
-import { CHART_COLORS, plotPoint, SeriesPlugin } from "./plugin";
+import type { ChartPalette } from "./palette";
+import { plotPoint, SeriesPlugin } from "./plugin";
 
 export interface ZoneModel {
   id: string;
@@ -15,7 +16,10 @@ export interface ZoneModel {
 
 /** Filled price/time rectangle for a fair-value gap or order block. */
 export class RectangleZonePrimitive extends SeriesPlugin {
-  constructor(private readonly zone: ZoneModel) {
+  constructor(
+    private readonly zone: ZoneModel,
+    private readonly colors: ChartPalette,
+  ) {
     super();
   }
 
@@ -36,12 +40,12 @@ export class RectangleZonePrimitive extends SeriesPlugin {
     const context = scope.context;
     const bullish = this.zone.direction !== "bearish";
     context.save();
-    context.fillStyle = bullish ? CHART_COLORS.zoneBull : CHART_COLORS.zoneBear;
-    context.strokeStyle = bullish ? CHART_COLORS.zoneBullStroke : CHART_COLORS.zoneBearStroke;
+    context.fillStyle = bullish ? this.colors.zoneBull : this.colors.zoneBear;
+    context.strokeStyle = bullish ? this.colors.zoneBullStroke : this.colors.zoneBearStroke;
     context.lineWidth = 1;
     context.fillRect(box.x, box.y, box.width, box.height);
     context.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
-    context.fillStyle = CHART_COLORS.label;
+    context.fillStyle = this.colors.label;
     context.font = "11px ui-sans-serif, system-ui, sans-serif";
     context.fillText(this.zone.label, box.x + 6, box.y + 14);
     context.restore();

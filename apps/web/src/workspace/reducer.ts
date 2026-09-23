@@ -1,6 +1,20 @@
 import { normalizeMarkdown } from "../lib/format";
 import { changeKindFor, cloneStructured, structuredEqual } from "./draft";
-import type { DraftRecord, ProposalRecord, RevisionRecord, StructuredDraft, WorkspaceAction, WorkspaceState } from "./types";
+import type {
+  Conversation,
+  DraftRecord,
+  ProposalRecord,
+  RevisionRecord,
+  StructuredDraft,
+  WorkspaceAction,
+  WorkspaceState,
+} from "./types";
+
+function attachedArtifactId(state: WorkspaceState, conversation: Conversation): string | null {
+  const attachment = conversation.attachment;
+  if (attachment?.kind !== "artifact") return null;
+  return state.artifacts.some((artifact) => artifact.id === attachment.id) ? attachment.id : null;
+}
 
 function createId(): string {
   return crypto.randomUUID();
@@ -55,8 +69,26 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       if (state.scroll[action.slot] === action.top) return state;
       return { ...state, scroll: { ...state.scroll, [action.slot]: action.top } };
     case "selectArtifact": {
-      if (!state.artifacts.some((artifact) => artifact.id === action.id)) return state;
-      return { ...state, selectedArtifactId: action.id, selectedAnnotationId: null, viewingRevisionId: null };
+      const artifact = state.artifacts.find((item) => item.id === action.id);
+      if (!artifact) return state;
+      const linkedConversation =
+        artifact.conversationId !== null &&
+        state.conversations.some((conversation) => conversation.id === artifact.conversationId)
+          ? artifact.conversationId
+          : state.activeConversationId;
+      const artifactChanged = artifact.id !== state.selectedArtifactId;
+      const conversationChanged = linkedConversation !== state.activeConversationId;
+      return {
+        ...state,
+        selectedArtifactId: artifact.id,
+        activeConversationId: linkedConversation,
+        selectedAnnotationId: null,
+        viewingRevisionId: null,
+        scroll: {
+          chat: conversationChanged ? 0 : state.scroll.chat,
+          report: artifactChanged ? 0 : state.scroll.report,
+        },
+      };
     }
     case "selectAnnotation":
       return { ...state, selectedAnnotationId: action.id };
@@ -64,9 +96,26 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       return { ...state, newChatOpen: true };
     case "closeNewChat":
       return { ...state, newChatOpen: false };
-    case "selectConversation":
-      if (!state.conversations.some((conversation) => conversation.id === action.id)) return state;
-      return { ...state, activeConversationId: action.id };
+    case "selectConversation": {
+      const conversation = state.conversations.find((item) => item.id === action.id);
+      if (!conversation) return state;
+      const linkedArtifact = attachedArtifactId(state, conversation);
+      const nextArtifactId = linkedArtifact ?? state.selectedArtifactId;
+      const artifactChanged = nextArtifactId !== state.selectedArtifactId;
+      const conversationChanged = conversation.id !== state.activeConversationId;
+      if (!artifactChanged && !conversationChanged) return state;
+      return {
+        ...state,
+        activeConversationId: conversation.id,
+        selectedArtifactId: nextArtifactId,
+        selectedAnnotationId: artifactChanged ? null : state.selectedAnnotationId,
+        viewingRevisionId: artifactChanged ? null : state.viewingRevisionId,
+        scroll: {
+          chat: conversationChanged ? 0 : state.scroll.chat,
+          report: artifactChanged ? 0 : state.scroll.report,
+        },
+      };
+    }
     case "startConversation": {
       const id = createId();
       const now = new Date().toISOString();
@@ -78,15 +127,21 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         attachment: action.attachment,
         messages: [],
       };
+      const attachment = action.attachment;
       const selectedArtifactId =
-        action.attachment?.kind === "artifact" ? action.attachment.id : state.selectedArtifactId;
+        attachment && attachment.kind === "artifact" && state.artifacts.some((artifact) => artifact.id === attachment.id)
+          ? attachment.id
+          : state.selectedArtifactId;
+      const artifactChanged = selectedArtifactId !== state.selectedArtifactId;
       return {
         ...state,
         newChatOpen: false,
         conversations: [conversation, ...state.conversations],
         activeConversationId: id,
         selectedArtifactId,
-        scroll: { chat: 0, report: state.scroll.report },
+        selectedAnnotationId: artifactChanged ? null : state.selectedAnnotationId,
+        viewingRevisionId: artifactChanged ? null : state.viewingRevisionId,
+        scroll: { chat: 0, report: artifactChanged ? 0 : state.scroll.report },
       };
     }
     case "sendMessage": {

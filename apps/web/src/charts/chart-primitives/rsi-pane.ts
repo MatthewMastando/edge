@@ -2,8 +2,9 @@ import type { IChartApi, ISeriesPrimitiveAxisView, LineData, UTCTimestamp } from
 import { LineSeries } from "lightweight-charts";
 
 import type { HitBox } from "./geometry";
-import { CHART_COLORS, PriceTag, SeriesPlugin } from "./plugin";
 import { MarkerPrimitive, type MarkerModel } from "./marker";
+import type { ChartPalette } from "./palette";
+import { PriceTag, SeriesPlugin } from "./plugin";
 
 export interface RsiPoint {
   time: UTCTimestamp;
@@ -18,12 +19,13 @@ export function attachRsiSubpane(
   chart: IChartApi,
   points: readonly RsiPoint[],
   marker: MarkerModel | null,
+  colors: ChartPalette,
 ): () => void {
   const data: LineData[] = points.map((point) => ({ time: point.time, value: point.value }));
   const series = chart.addSeries(
     LineSeries,
     {
-      color: CHART_COLORS.rsiLine,
+      color: colors.rsiLine,
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: true,
@@ -34,9 +36,9 @@ export function attachRsiSubpane(
   );
   series.setData(data);
   series.getPane().setHeight(112);
-  const guides = new RsiGuidePrimitive();
+  const guides = new RsiGuidePrimitive(colors);
   series.attachPrimitive(guides);
-  const markerPrimitive = marker ? new MarkerPrimitive(marker) : null;
+  const markerPrimitive = marker ? new MarkerPrimitive(marker, colors) : null;
   if (markerPrimitive) series.attachPrimitive(markerPrimitive);
   return () => {
     series.detachPrimitive(guides);
@@ -50,12 +52,14 @@ class RsiGuidePrimitive extends SeriesPlugin {
   private readonly lower = new PriceTag();
   private readonly axisCache: readonly ISeriesPrimitiveAxisView[];
 
-  constructor() {
+  constructor(private readonly colors: ChartPalette) {
     super();
     this.upper.label = "70";
     this.lower.label = "30";
-    this.upper.color = CHART_COLORS.rsiBand;
-    this.lower.color = CHART_COLORS.rsiBand;
+    this.upper.color = colors.rsiBand;
+    this.lower.color = colors.rsiBand;
+    this.upper.ink = colors.text;
+    this.lower.ink = colors.text;
     this.axisCache = [this.upper, this.lower];
   }
 
@@ -86,11 +90,11 @@ class RsiGuidePrimitive extends SeriesPlugin {
   draw(scope: { context: CanvasRenderingContext2D; width: number }): void {
     const context = scope.context;
     context.save();
-    context.strokeStyle = CHART_COLORS.rsiBand;
+    context.strokeStyle = this.colors.rsiBand;
     context.lineWidth = 1;
     context.setLineDash([2, 3]);
     context.font = "10px ui-sans-serif, system-ui, sans-serif";
-    context.fillStyle = CHART_COLORS.rsiBand;
+    context.fillStyle = this.colors.rsiBand;
     for (const price of [30, 70]) {
       const y = this.series?.priceToCoordinate(price);
       if (y === null || y === undefined) continue;

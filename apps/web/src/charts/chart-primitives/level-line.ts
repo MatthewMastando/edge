@@ -1,7 +1,8 @@
 import type { ISeriesPrimitiveAxisView, UTCTimestamp } from "lightweight-charts";
 
 import type { HitBox } from "./geometry";
-import { CHART_COLORS, plotPoint, PriceTag, SeriesPlugin } from "./plugin";
+import type { ChartPalette } from "./palette";
+import { plotPoint, PriceTag, SeriesPlugin } from "./plugin";
 
 export interface LevelModel {
   id: string;
@@ -16,10 +17,14 @@ export class LabeledLevelPrimitive extends SeriesPlugin {
   private readonly tag = new PriceTag();
   private readonly axisCache: readonly ISeriesPrimitiveAxisView[];
 
-  constructor(private readonly level: LevelModel) {
+  constructor(
+    private readonly level: LevelModel,
+    private readonly colors: ChartPalette,
+  ) {
     super();
     this.tag.label = level.label;
-    this.tag.color = CHART_COLORS.level;
+    this.tag.color = colors.level;
+    this.tag.ink = colors.levelInk;
     this.axisCache = [this.tag];
   }
 
@@ -49,7 +54,7 @@ export class LabeledLevelPrimitive extends SeriesPlugin {
     const y = box.y + 4;
     const context = scope.context;
     context.save();
-    context.strokeStyle = CHART_COLORS.level;
+    context.strokeStyle = this.colors.level;
     context.lineWidth = 1;
     context.setLineDash([4, 3]);
     context.beginPath();
@@ -61,9 +66,9 @@ export class LabeledLevelPrimitive extends SeriesPlugin {
     const text = this.level.label;
     const pad = 4;
     const width = context.measureText(text).width + pad * 2;
-    context.fillStyle = CHART_COLORS.level;
+    context.fillStyle = this.colors.level;
     context.fillRect(8, y - 16, width, 14);
-    context.fillStyle = CHART_COLORS.levelInk;
+    context.fillStyle = this.colors.levelInk;
     context.fillText(text, 8 + pad, y - 5);
     context.restore();
   }

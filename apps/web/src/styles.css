@@ -388,6 +388,8 @@ input, select, textarea { padding: 0.45rem 0.55rem; width: 100%; }
 
 .chart-frame { position: relative; }
 
+.chart-canvas-wrap { position: relative; }
+
 .chart-canvas { height: 460px; }
 
 .chart-tooltip {

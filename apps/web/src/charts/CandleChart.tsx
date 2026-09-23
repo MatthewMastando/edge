@@ -14,6 +14,7 @@ import { provenanceLabel } from "../lib/provenance";
 import { buildAnnotations, rsiPoints, type AnnotationView } from "./annotations";
 import { AnnotationInspector } from "./AnnotationInspector";
 import { attachResearchPrimitives, type TooltipState } from "./chart-primitives";
+import { chartPalette } from "./chart-primitives/palette";
 
 function hoverId(param: MouseEventParams): string | null {
   const candidate = param.hoveredInfo?.objectId;
@@ -50,20 +51,21 @@ export function CandleChart({
     if (!canDraw) return;
     const host = hostRef.current;
     if (!host) return;
+    const colors = chartPalette(host);
     const chart: IChartApi = createChart(host, {
       autoSize: true,
       height: 460,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#a8a396",
+        textColor: colors.textDim,
         fontFamily: "Segoe UI, Helvetica Neue, system-ui, sans-serif",
       },
       grid: {
-        vertLines: { color: "#2a2e36" },
-        horzLines: { color: "#2a2e36" },
+        vertLines: { color: colors.grid },
+        horzLines: { color: colors.grid },
       },
-      rightPriceScale: { borderColor: "#31363f" },
-      timeScale: { borderColor: "#31363f", timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: colors.border },
+      timeScale: { borderColor: colors.border, timeVisible: true, secondsVisible: false },
       localization: {
         timeFormatter: (time: Time) => {
           if (typeof time !== "number") return "";
@@ -78,12 +80,12 @@ export function CandleChart({
       },
     });
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#8eae86",
-      downColor: "#c4847c",
-      borderUpColor: "#8eae86",
-      borderDownColor: "#c4847c",
-      wickUpColor: "#8eae86",
-      wickDownColor: "#c4847c",
+      upColor: colors.up,
+      downColor: colors.down,
+      borderUpColor: colors.up,
+      borderDownColor: colors.down,
+      wickUpColor: colors.up,
+      wickDownColor: colors.down,
     });
     series.setData(
       bars.map((bar) => ({
@@ -99,6 +101,7 @@ export function CandleChart({
       candleSeries: series,
       annotations,
       rsi: points,
+      colors,
     });
     const selectFrom = (param: MouseEventParams) => {
       const id = hoverId(param);
@@ -131,10 +134,14 @@ export function CandleChart({
         {label?.isDemonstration ? <span className="banner banner-inline">{label.text}</span> : null}
         <p className="hint">Axis times are America/New_York. The RSI pane is Wilder RSI(14) on these closes.</p>
       </header>
-      {canDraw ? <div ref={hostRef} className="chart-canvas" data-testid="candle-chart" /> : null}
-      {tooltip ? (
-        <div className="chart-tooltip" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }} role="tooltip">
-          {tooltip.label}
+      {canDraw ? (
+        <div className="chart-canvas-wrap">
+          <div ref={hostRef} className="chart-canvas" data-testid="candle-chart" />
+          {tooltip ? (
+            <div className="chart-tooltip" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }} role="tooltip">
+              {tooltip.label}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {!canDraw ? <p className="hint">The canvas chart renders in a browser. Annotations stay selectable below.</p> : null}

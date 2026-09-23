@@ -1,7 +1,8 @@
 import type { UTCTimestamp } from "lightweight-charts";
 
 import { boxAroundPoint, type HitBox } from "./geometry";
-import { CHART_COLORS, plotPoint, SeriesPlugin } from "./plugin";
+import type { ChartPalette } from "./palette";
+import { plotPoint, SeriesPlugin } from "./plugin";
 
 export interface MarkerModel {
   id: string;
@@ -15,7 +16,10 @@ const RADIUS = 6;
 
 /** Point marker. The HTML tooltip is positioned by the chart when this primitive is hovered. */
 export class MarkerPrimitive extends SeriesPlugin {
-  constructor(private readonly marker: MarkerModel) {
+  constructor(
+    private readonly marker: MarkerModel,
+    private readonly colors: ChartPalette,
+  ) {
     super();
   }
 
@@ -33,17 +37,17 @@ export class MarkerPrimitive extends SeriesPlugin {
     const context = scope.context;
     const fill =
       this.marker.direction === "bearish"
-        ? CHART_COLORS.markerBear
+        ? this.colors.markerBear
         : this.marker.direction === "bullish"
-          ? CHART_COLORS.markerBull
-          : CHART_COLORS.markerNeutral;
+          ? this.colors.markerBull
+          : this.colors.markerNeutral;
     context.save();
     context.beginPath();
     context.arc(x, y, RADIUS, 0, Math.PI * 2);
     context.fillStyle = fill;
     context.fill();
     context.lineWidth = 1.5;
-    context.strokeStyle = CHART_COLORS.ink;
+    context.strokeStyle = this.colors.markerInk;
     context.stroke();
     context.restore();
   }

@@ -22,22 +22,6 @@ interface MediaScope {
 
 import { hitTestBoxes, type HitBox } from "./geometry";
 
-export const CHART_COLORS = {
-  zoneBull: "rgba(142, 174, 134, 0.22)",
-  zoneBullStroke: "#8eae86",
-  zoneBear: "rgba(196, 132, 124, 0.22)",
-  zoneBearStroke: "#c4847c",
-  level: "#d7b07a",
-  levelInk: "#241c12",
-  markerBull: "#8eae86",
-  markerBear: "#c4847c",
-  markerNeutral: "#d7b07a",
-  ink: "#14161c",
-  rsiLine: "#d7b07a",
-  rsiBand: "rgba(168, 163, 150, 0.85)",
-  label: "#eceae4",
-} as const;
-
 export interface Plotter {
   chart: IChartApiBase | null;
   series: ISeriesApi<SeriesType> | null;
@@ -87,7 +71,8 @@ class PaneView implements IPrimitivePaneView {
 export class PriceTag implements ISeriesPrimitiveAxisView {
   coordinateValue = -1_000_000;
   label = "";
-  color: string = CHART_COLORS.level;
+  color = "#d7b07a";
+  ink = "#241c12";
   coordinate(): number {
     return this.coordinateValue;
   }
@@ -95,7 +80,7 @@ export class PriceTag implements ISeriesPrimitiveAxisView {
     return this.label;
   }
   textColor(): string {
-    return CHART_COLORS.levelInk;
+    return this.ink;
   }
   backColor(): string {
     return this.color;
