@@ -314,6 +314,23 @@ async def cancel_job(conn: AsyncConnection, job_id: UUID) -> Job | None:
     return None if row is None else job_from_row(row)
 
 
+async def earliest_run_id(conn: AsyncConnection, job_id: UUID) -> UUID | None:
+    """The run already stored for this job, if resume lost the checkpoint copy of its id."""
+    row = await fetch_one(
+        conn,
+        """
+        select id from runs
+        where job_id = :job_id
+        order by started_at asc
+        limit 1
+        """,
+        {"job_id": job_id},
+    )
+    if row is None:
+        return None
+    return as_uuid(row["id"])
+
+
 async def insert_run(
     conn: AsyncConnection,
     *,

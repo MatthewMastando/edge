@@ -11,6 +11,11 @@ from trading_core.domain.thesis import (
     ValidationCheck,
     ValidationResult,
 )
+from trading_core.harness.annotations import (
+    SavedCalculation,
+    annotation_id_for,
+    same_levels,
+)
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -27,11 +32,13 @@ def validate_thesis(
     tick_value: Decimal | None,
     point_value: Decimal | None,
     repair_attempted: bool = False,
+    calculations: dict[UUID, SavedCalculation] | None = None,
 ) -> ValidationResult:
     checks = [
         _schema_check(thesis),
         _feature_check(thesis, known_feature_ids),
         _numeric_check(thesis, feature_levels),
+        _annotation_check(thesis, calculations),
         _evidence_check(thesis, known_source_ids, known_excerpt_ids),
         _risk_check(thesis, tick_value, point_value),
     ]
@@ -53,7 +60,11 @@ def repair_thesis(
     point_value: Decimal | None,
 ) -> Thesis:
     """Drop claims that do not resolve to saved features or evidence. Does not invent numbers."""
-    findings = [item for item in thesis.technical_findings if item.feature_id in known_feature_ids]
+    findings = [
+        item.model_copy(update={"annotation_id": annotation_id_for(item.feature_id)})
+        for item in thesis.technical_findings
+        if item.feature_id in known_feature_ids
+    ]
     known_prices: set[Decimal] = set()
     for finding in findings:
         known_prices.update(feature_levels.get(finding.feature_id, set()))
@@ -140,6 +151,38 @@ def _numeric_check(thesis: Thesis, feature_levels: dict[UUID, set[Decimal]]) -> 
             detail="prices do not match a referenced feature level: " + ", ".join(bad),
         )
     return ValidationCheck(name="numeric_crosscheck", passed=True, detail=None)
+
+
+def _annotation_check(
+    thesis: Thesis, calculations: dict[UUID, SavedCalculation] | None
+) -> ValidationCheck:
+    """Chart annotations and thesis findings must be the saved feature, not a new number."""
+    if calculations is None:
+        return ValidationCheck(name="annotation_crosscheck", passed=True, detail=None)
+    bad: list[str] = []
+    for finding in thesis.technical_findings:
+        saved = calculations.get(finding.feature_id)
+        expected = annotation_id_for(finding.feature_id)
+        if saved is None or finding.annotation_id != expected or not _annotation_matches(saved):
+            bad.append(str(finding.feature_id))
+    if bad:
+        return ValidationCheck(
+            name="annotation_crosscheck",
+            passed=False,
+            detail="chart annotation does not match the saved calculation: " + ", ".join(bad),
+        )
+    return ValidationCheck(name="annotation_crosscheck", passed=True, detail=None)
+
+
+def _annotation_matches(saved: SavedCalculation) -> bool:
+    annotation = saved.annotation
+    return (
+        annotation.id == annotation_id_for(saved.feature_id)
+        and annotation.feature_id == saved.feature_id
+        and annotation.detector == saved.detector
+        and annotation.calc_version == saved.calc_version
+        and same_levels(annotation.levels, saved.levels)
+    )
 
 
 def _evidence_check(

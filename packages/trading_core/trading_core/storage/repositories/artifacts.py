@@ -132,6 +132,26 @@ async def lock_artifact(conn: AsyncConnection, artifact_id: UUID, owner_id: UUID
     return row is not None
 
 
+async def generated_revision_for_run(
+    conn: AsyncConnection, run_id: UUID
+) -> tuple[UUID, UUID] | None:
+    """Revision id and artifact id already written for this run, if any."""
+    row = await fetch_one(
+        conn,
+        """
+        select id, artifact_id
+        from artifact_revisions
+        where run_id = :run_id and change_kind = 'generated'
+        order by revision_number asc
+        limit 1
+        """,
+        {"run_id": run_id},
+    )
+    if row is None:
+        return None
+    return as_uuid(row["id"]), as_uuid(row["artifact_id"])
+
+
 async def insert_revision(
     conn: AsyncConnection,
     *,

@@ -5,8 +5,10 @@ technical analysis, gathers sourced market context, writes validated theses and 
 schedules and TA triggers. **Research only — there is no broker order-write capability anywhere in
 this repository, and CI enforces that.**
 
-This is the Stage 0 foundation: monorepo, database schema, shared contracts, fixture data, local
-startup and CI. Stage 1 builds the TA library, the harness/persistence layer and the web app on top.
+Stage 0 is the monorepo, schema, contracts and fixture data. Stage 1 adds the calc 1.0.0 TA
+library, the harness and the web shell. The fixture research path runs those detectors: a seeded
+futures contract is snapshotted, features are saved, and the recorded thesis is labeled
+demonstration.
 
 ## Layout
 
