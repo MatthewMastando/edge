@@ -136,7 +136,7 @@ export type WorkspaceAction =
   | { type: "sendMessage"; text: string; now?: string }
   | { type: "updateStructured"; artifactId: string; patch: Partial<StructuredDraft> }
   | { type: "updateNarrative"; artifactId: string; markdown: string }
-  | { type: "draftsSaved"; now?: string }
+  | { type: "draftsSaved"; now?: string; stamps?: Record<string, string> }
   | { type: "saveRevision"; artifactId: string; now?: string }
   | { type: "addTag"; artifactId: string; tag: string }
   | { type: "removeTag"; artifactId: string; tag: string }

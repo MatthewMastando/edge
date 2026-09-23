@@ -58,7 +58,7 @@ export async function saveDraftRemote(draft: DraftRecord): Promise<void> {
     body: {
       base_revision_id: draft.baseRevisionId,
       presentation_markdown: draft.presentationMarkdown,
-      structured: formPayload(draft.structured),
+      structured: formPayload(draft.structured, draft.updatedAt),
     },
   });
   if (!saved.response.ok) {
@@ -308,7 +308,7 @@ function summaryRevision(
   };
 }
 
-function formPayload(form: StructuredDraft): { [key: string]: string } {
+function formPayload(form: StructuredDraft, updatedAt: string): { [key: string]: string } {
   return {
     stance: form.stance,
     entry: form.entry,
@@ -317,6 +317,7 @@ function formPayload(form: StructuredDraft): { [key: string]: string } {
     contracts: form.contracts,
     estimatedCosts: form.estimatedCosts,
     unsetReason: form.unsetReason,
+    clientUpdatedAt: updatedAt,
   };
 }
 

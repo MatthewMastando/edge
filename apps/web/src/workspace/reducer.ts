@@ -197,6 +197,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
       const drafts = { ...state.drafts };
       for (const [id, draft] of Object.entries(drafts)) {
         if (draft.saveState !== "pending") continue;
+        if (action.stamps && action.stamps[id] !== draft.updatedAt) continue;
         drafts[id] = { ...draft, saveState: "saved", updatedAt: now };
         changed = true;
       }

@@ -77,10 +77,19 @@ interface SavedAnnotation {
   confirmation_time: string | null;
 }
 
+function hasChartAnnotation(feature: TAFeature): boolean {
+  const details = feature.details;
+  return details !== undefined && Object.hasOwn(details, "chart_annotation");
+}
+
 /** Prefer features that carry a saved chart annotation. Shell fixtures keep their own list. */
 export function selectChartFeatures(features: readonly TAFeature[]): TAFeature[] {
   const saved = features.filter((feature) => readSaved(feature) !== null);
-  if (saved.length === 0) return [...features];
+  if (saved.length === 0) {
+    // Fixture rows carry chart_annotation. A rejected annotation stays blank.
+    // The mock shell has no chart_annotation and keeps its bar-index figures.
+    return features.some(hasChartAnnotation) ? [] : [...features];
+  }
   const grouped = new Map<TAFeature["detector"], TAFeature[]>();
   for (const feature of saved) {
     const bucket = grouped.get(feature.detector) ?? [];
@@ -114,6 +123,7 @@ export function buildAnnotations(features: readonly TAFeature[], bars: readonly 
       views.push(...viewsFromSaved(feature, saved, bars));
       continue;
     }
+    if (hasChartAnnotation(feature)) continue;
     const kind = detailString(feature, "kind");
     const calculation = detailString(feature, "calculation") ?? feature.detector;
     const start = detailNumber(feature, "start_bar");

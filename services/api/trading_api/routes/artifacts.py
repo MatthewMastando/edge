@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated, cast
 from uuid import UUID
@@ -219,17 +220,24 @@ async def get_draft(artifact_id: UUID, user: UserDep, database: DatabaseDep) -> 
 async def save_draft(
     artifact_id: UUID, body: DraftBody, user: UserDep, database: DatabaseDep
 ) -> DraftResponse:
-    """Autosave the editable presentation. This does not create a revision."""
+    """Autosave the editable presentation. This does not create a revision.
+
+    A slower request for an older ``clientUpdatedAt`` does not overwrite a newer draft.
+    """
     async with database.engine.begin() as conn:
         await _owned(conn, artifact_id, user.id)
-        await artifacts.upsert_draft(
-            conn,
-            artifact_id=artifact_id,
-            base_revision_id=body.base_revision_id,
-            structured=body.structured,
-            presentation_markdown=body.presentation_markdown,
-        )
-        row = await artifacts.get_draft(conn, artifact_id)
+        existing = await artifacts.get_draft(conn, artifact_id)
+        if draft_write_is_stale(existing, body.structured):
+            row = existing
+        else:
+            await artifacts.upsert_draft(
+                conn,
+                artifact_id=artifact_id,
+                base_revision_id=body.base_revision_id,
+                structured=body.structured,
+                presentation_markdown=body.presentation_markdown,
+            )
+            row = await artifacts.get_draft(conn, artifact_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Draft not found")
     structured = row["structured"]
@@ -349,6 +357,31 @@ def _apply_user_edit(thesis: Thesis, body: UserRevisionBody) -> Thesis:
             "presentation_markdown": body.presentation_markdown,
         }
     )
+
+
+def client_updated_at(structured: object) -> str | None:
+    """Client clock stamp stored on an autosaved draft. Missing means the row is unversioned."""
+    if structured is None:
+        return None
+    try:
+        data = as_json_dict(structured)
+    except (TypeError, ValueError):
+        return None
+    stamp = data.get("clientUpdatedAt")
+    if isinstance(stamp, str) and stamp:
+        return stamp
+    return None
+
+
+def draft_write_is_stale(existing: Mapping[str, object] | None, incoming: object) -> bool:
+    """True when ``incoming`` is an older autosave than the draft already stored."""
+    if existing is None:
+        return False
+    old = client_updated_at(existing.get("structured"))
+    new = client_updated_at(incoming)
+    if old is None or new is None:
+        return False
+    return new < old
 
 
 def _form_payload(body: UserRevisionBody) -> dict[str, JsonValue]:

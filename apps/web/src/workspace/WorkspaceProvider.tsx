@@ -40,9 +40,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "draftsSaved" });
         return;
       }
+      const stamps = Object.fromEntries(pending.map((draft) => [draft.artifactId, draft.updatedAt]));
       void Promise.all(pending.map((draft) => saveDraftRemote(draft)))
         .then(() => {
-          dispatch({ type: "draftsSaved" });
+          dispatch({ type: "draftsSaved", stamps });
         })
         .catch(() => {
           // Leave the draft pending so the next edit retries the save.

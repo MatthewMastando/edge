@@ -97,4 +97,31 @@ describe("saved chart annotations", () => {
     const tampered = { ...saved, details: { ...details, chart_annotation: forged } };
     expect(buildAnnotations([tampered], bars())).toEqual([]);
   });
+
+  it("does not draw bar-index geometry when a saved annotation is rejected", () => {
+    const saved = feature();
+    const details = saved.details ?? {};
+    const raw = details["chart_annotation"];
+    if (typeof raw !== "object" || raw === null) throw new Error("missing annotation");
+    const forged = {
+      ...raw,
+      levels: [
+        { name: "zone_lower", price: "9.99", role: "zone_lower" },
+        { name: "zone_upper", price: "9.98", role: "zone_upper" },
+      ],
+    };
+    const tampered = {
+      ...saved,
+      details: {
+        ...details,
+        chart_annotation: forged,
+        kind: "zone",
+        start_bar: 0,
+        end_bar: 2,
+        calculation: "mock geometry",
+      },
+    };
+    expect(selectChartFeatures([tampered])).toEqual([]);
+    expect(buildAnnotations([tampered], bars())).toEqual([]);
+  });
 });
