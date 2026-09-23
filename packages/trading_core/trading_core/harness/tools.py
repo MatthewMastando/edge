@@ -413,7 +413,10 @@ def build_research_registry(*, include_web: bool = True) -> ToolRegistry:
             ToolDefinition(
                 spec=_spec(
                     "fred_series",
-                    "Read one FRED series. A missing key is a source failure, not a filled-in value.",
+                    (
+                        "Read one FRED series. A missing key is a source failure, "
+                        "not a filled-in value."
+                    ),
                     _schema({"series_id": {"type": "string", "maxLength": 64}}, ["series_id"]),
                     external=True,
                     max_calls=4,
