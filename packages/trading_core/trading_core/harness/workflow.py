@@ -47,6 +47,7 @@ from trading_core.harness.secrets import redact
 from trading_core.harness.thesis_builder import assemble_thesis
 from trading_core.harness.tools import ToolRegistry, ToolSession, build_research_registry
 from trading_core.harness.validation import attach_validation, repair_thesis, validate_thesis
+from trading_core.labeling import tool_feed
 from trading_core.storage.base import ObjectNotFoundError
 from trading_core.storage.repositories import (
     artifacts,
@@ -261,7 +262,9 @@ class ResearchWorkflow:
         stored_bars = self._deps.store.put_table(bar_key, bar_table)
         last = bars.bars[-1]
         first = bars.bars[0]
-        coverage = self._deps.adapter.capabilities.coverage_note
+        feed = tool_feed(self._deps.adapter, payload.symbol)
+        coverage = _snapshot_coverage(self._deps.adapter, feed)
+        provider_name = _snapshot_provider(self._deps.adapter, feed)
         bar_snapshot = MarketSnapshot(
             id=uuid4(),
             instrument_id=instrument_id,
@@ -272,7 +275,7 @@ class ResearchWorkflow:
             range_end=last.origin_time,
             as_of=last.origin_time,
             as_of_tz=last.origin_tz,
-            provider=self._deps.adapter.capabilities.provider,
+            provider=provider_name,
             provenance=bars.provenance,
             data_revision=bars.data_revision,
             storage_key=bar_key,
@@ -304,7 +307,7 @@ class ResearchWorkflow:
                     range_end=trade_end,
                     as_of=last.origin_time,
                     as_of_tz=last.origin_tz,
-                    provider=self._deps.adapter.capabilities.provider,
+                    provider=provider_name,
                     provenance=trades.provenance,
                     data_revision=trades.data_revision,
                     storage_key=trade_key,
@@ -479,6 +482,8 @@ class ResearchWorkflow:
                     ],
                 }
             )
+        if self._deps.research is not None:
+            return await self._gather_configured(job, checkpoint, payload)
         if checkpoint.retrievals_used >= self._deps.limits.max_external_retrievals:
             return checkpoint.model_copy(
                 update={
@@ -531,6 +536,75 @@ class ResearchWorkflow:
                 "source_ids": [source_id],
                 "excerpt_ids": [excerpt.id],
                 "retrievals_used": checkpoint.retrievals_used + 1,
+            }
+        )
+
+    async def _gather_configured(
+        self, job: Job, checkpoint: ResearchCheckpoint, payload: ResearchPayload
+    ) -> ResearchCheckpoint:
+        research = self._deps.research
+        if research is None:
+            return checkpoint
+        if checkpoint.retrievals_used >= self._deps.limits.max_external_retrievals:
+            return checkpoint.model_copy(
+                update={
+                    "partial_research": True,
+                    "stop_reason": "retrieval_cap",
+                    "warnings": [
+                        *checkpoint.warnings,
+                        "external retrieval cap reached before context",
+                    ],
+                }
+            )
+        budget = self._budget(checkpoint, job)
+        reservation = await budget.reserve(
+            category="search",
+            provider=research.search.name,
+            estimate=self._deps.limits.retrieval_reserve_usd,
+            unit_type="calls",
+        )
+        try:
+            hits, external = await research.gather(
+                symbol=payload.symbol,
+                asset_class=checkpoint.asset_class or "",
+                question=payload.question,
+            )
+            source_ids: list[UUID] = []
+            excerpt_ids: list[UUID] = []
+            async with self._deps.engine.begin() as conn:
+                for hit in hits:
+                    source_id = await sources.insert_source(
+                        conn,
+                        kind=hit.kind,
+                        url=hit.url,
+                        title=hit.title,
+                        publisher=hit.publisher,
+                        published_at=hit.published_at,
+                        retrieved_at=hit.retrieved_at,
+                        provider=hit.label.source,
+                        provenance=hit.label.provenance,
+                        status=_source_status(hit.status),
+                        error=hit.error,
+                    )
+                    excerpt = await sources.insert_excerpt(
+                        conn,
+                        source_id=source_id,
+                        text=hit.labeled_text(),
+                        published_at=hit.published_at,
+                        retrieved_at=hit.retrieved_at,
+                        provenance=hit.label.provenance,
+                        kind=hit.kind,
+                        url=hit.url,
+                    )
+                    source_ids.append(source_id)
+                    excerpt_ids.append(excerpt.id)
+        finally:
+            await budget.reconcile(reservation, Decimal(0))
+        return checkpoint.model_copy(
+            update={
+                "source_ids": source_ids,
+                "excerpt_ids": excerpt_ids,
+                "retrievals_used": checkpoint.retrievals_used + external,
             }
         )
 
@@ -1187,6 +1261,28 @@ def _required_uuid(value: UUID | None, label: str) -> UUID:
 
 def _unique_ids(values: list[UUID]) -> list[UUID]:
     return list(dict.fromkeys(values))
+
+
+def _snapshot_coverage(adapter: object, feed: dict[str, str]) -> str | None:
+    if feed.get("provenance") == "fixture":
+        capabilities = getattr(adapter, "capabilities", None)
+        note = getattr(capabilities, "coverage_note", None)
+        return str(note) if isinstance(note, str) else None
+    return f"source={feed['source']}; coverage={feed['coverage']}; delay={feed['delay']}"
+
+
+def _snapshot_provider(adapter: object, feed: dict[str, str]) -> str:
+    if feed.get("provenance") == "fixture":
+        capabilities = getattr(adapter, "capabilities", None)
+        provider = getattr(capabilities, "provider", "fixture")
+        return str(provider)
+    return feed["source"]
+
+
+def _source_status(status: str) -> str:
+    if status in {"ok", "stale", "failed", "rate_limited"}:
+        return status
+    return "failed"
 
 
 def _summary(feature: TAFeature) -> dict[str, JsonValue]:

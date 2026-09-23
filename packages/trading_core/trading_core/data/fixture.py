@@ -17,6 +17,7 @@ from trading_core.data.adapter import (
 from trading_core.domain.market import BarSeries, TradeBatch
 from trading_core.fixtures.generator import bars_key, trades_key
 from trading_core.fixtures.manifest import FixtureManifest, read_manifest
+from trading_core.labeling import FeedLabel
 from trading_core.storage.local import LocalParquetStore
 from trading_core.storage.schemas import TIMESTAMP_TYPE, table_to_bars, table_to_trades
 
@@ -39,6 +40,20 @@ class FixtureAdapter:
     @property
     def manifest(self) -> FixtureManifest:
         return self._manifest
+
+    @property
+    def root(self) -> Path:
+        return self._root
+
+    def feed_label(self, symbol: str) -> FeedLabel:
+        del symbol
+        note = self.capabilities.coverage_note or "synthetic demonstration data"
+        return FeedLabel(
+            source="fixture",
+            coverage=note,
+            delay="none; demonstration data has no exchange delay",
+            provenance="fixture",
+        )
 
     @property
     def capabilities(self) -> AdapterCapabilities:

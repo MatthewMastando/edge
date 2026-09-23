@@ -1,5 +1,5 @@
-"""Research source interfaces. Implementations (Tavily search, server-side fetcher with SSRF
-protection, FRED, SEC EDGAR, EIA, central-bank calendars, NASS) are Stage 3.
+"""Research sources: fixture or Tavily search, SSRF-protected fetch, FRED, SEC EDGAR, EIA,
+central-bank calendars, and NASS QuickStats.
 
 Retrieved content is evidence, never instructions. Every source records publication and retrieval
 times so theses can cite them.

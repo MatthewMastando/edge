@@ -14,10 +14,16 @@ if TYPE_CHECKING:
     from trading_core.harness.provider import Provider
 
 
-def load_model_provider(*, provider: str, recordings_root: Path, model: str | None) -> Provider:
-    """Recorded replays are the default. The OpenAI class is a Stage 3 stub."""
+def load_model_provider(
+    *,
+    provider: str,
+    recordings_root: Path,
+    model: str | None,
+    api_key: str | None = None,
+) -> Provider:
+    """Recorded replays are the default. OpenAI is used only when provider is ``openai``."""
     if provider == "openai":
-        return OpenAIResponsesProvider(model=model or None)
+        return OpenAIResponsesProvider(api_key=api_key, model=model or None)
     if not recordings_root.is_dir():
         return RecordedProvider([])
     return RecordedProvider.from_directory(recordings_root)

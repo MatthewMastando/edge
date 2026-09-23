@@ -52,6 +52,24 @@ class ApiSettings(BaseSettings):
         default=Path("fixtures/recorded"), alias="LLM_RECORDINGS_ROOT"
     )
     llm_model: str = Field(default="", alias="OPENAI_MODEL")
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    market_data_futures: str = Field(default="fixture", alias="MARKET_DATA_FUTURES")
+    market_data_equities: str = Field(default="fixture", alias="MARKET_DATA_EQUITIES")
+    market_data_crypto: str = Field(default="fixture", alias="MARKET_DATA_CRYPTO")
+    databento_api_key: str = Field(default="", alias="DATABENTO_API_KEY")
+    alpaca_key_id: str = Field(default="", alias="ALPACA_API_KEY_ID")
+    alpaca_secret: str = Field(default="", alias="ALPACA_API_SECRET_KEY")
+    alpaca_feed: str = Field(default="iex", alias="ALPACA_DATA_FEED")
+    search_provider: str = Field(default="fixture", alias="SEARCH_PROVIDER")
+    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
+    fred_api_key: str = Field(default="", alias="FRED_API_KEY")
+    eia_api_key: str = Field(default="", alias="EIA_API_KEY")
+    nass_api_key: str = Field(default="", alias="USDA_NASS_API_KEY")
+    sec_user_agent: str = Field(default="", alias="SEC_EDGAR_USER_AGENT")
+    research_domain_allow: str = Field(default="", alias="RESEARCH_DOMAIN_ALLOW")
+    research_domain_deny: str = Field(default="", alias="RESEARCH_DOMAIN_DENY")
+    fetch_max_bytes: int = Field(default=1_000_000, alias="RESEARCH_FETCH_MAX_BYTES", ge=1)
+    fetch_timeout_seconds: float = Field(default=10, alias="RESEARCH_FETCH_TIMEOUT_SECONDS", gt=0)
     max_external_retrievals: int = Field(default=12, alias="RESEARCH_MAX_RETRIEVALS", ge=0)
     max_evidence_tokens: int = Field(default=25_000, alias="RESEARCH_MAX_EVIDENCE_TOKENS", ge=1)
     max_model_iterations: int = Field(default=6, alias="RESEARCH_MAX_ITERATIONS", ge=1)
@@ -81,6 +99,13 @@ class ApiSettings(BaseSettings):
             "storage_backend": self.storage_backend,
             "fixtures_root": str(self.fixtures_root),
             "llm_provider": self.llm_provider,
+            "openai_api_key": "set" if self.openai_api_key else "unset",
+            "market_data_futures": self.market_data_futures,
+            "market_data_equities": self.market_data_equities,
+            "market_data_crypto": self.market_data_crypto,
+            "databento_api_key": "set" if self.databento_api_key else "unset",
+            "alpaca_keys": "set" if self.alpaca_key_id and self.alpaca_secret else "unset",
+            "search_provider": self.search_provider,
             "database": "configured" if self.database_url else "missing",
             "supabase_jwt_secret": "set" if self.supabase_jwt_secret else "unset",
         }

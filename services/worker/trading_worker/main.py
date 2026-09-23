@@ -18,12 +18,14 @@ from typing import TYPE_CHECKING, Protocol
 from trading_core.automation.dispatch import dispatch_due, evaluate_triggers
 from trading_core.automation.hypotheses import observe_open
 from trading_core.automation.scan import run_scan
+from trading_core.data.factory import market_config_from_values, select_market_adapter
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.harness.deps import WorkflowDeps
 from trading_core.harness.factory import load_detectors, load_model_provider
 from trading_core.harness.limits import ResearchLimits
 from trading_core.harness.runner import run_leased_job
 from trading_core.harness.secrets import secrets_from_environ
+from trading_core.research.factory import build_research_services, research_config_from_values
 from trading_core.storage.db import Database
 from trading_core.storage.local import LocalParquetStore
 from trading_core.storage.repositories import jobs
@@ -223,14 +225,39 @@ def build_worker(settings: WorkerSettings) -> Worker:
         log.warning("fixture manifest not found at %s; worker will idle", settings.fixtures_root)
         return Worker(settings, registry, None)
     database = Database(settings.database_url)
+    market = market_config_from_values(
+        futures=settings.market_data_futures,
+        equities=settings.market_data_equities,
+        crypto=settings.market_data_crypto,
+        databento_api_key=settings.databento_api_key,
+        alpaca_key_id=settings.alpaca_key_id,
+        alpaca_secret=settings.alpaca_secret,
+        alpaca_feed=settings.alpaca_feed,
+    )
+    research = build_research_services(
+        research_config_from_values(
+            search_provider=settings.search_provider,
+            tavily_api_key=settings.tavily_api_key,
+            fred_api_key=settings.fred_api_key,
+            eia_api_key=settings.eia_api_key,
+            nass_api_key=settings.nass_api_key,
+            sec_user_agent=settings.sec_user_agent,
+            domain_allow=settings.research_domain_allow,
+            domain_deny=settings.research_domain_deny,
+            max_bytes=settings.fetch_max_bytes,
+            timeout_seconds=settings.fetch_timeout_seconds,
+        )
+    )
     provider = load_model_provider(
         provider=settings.llm_provider,
         recordings_root=settings.llm_recordings_root,
         model=settings.llm_model or None,
+        api_key=settings.openai_api_key,
     )
     deps = WorkflowDeps(
         engine=database.engine,
-        adapter=adapter,
+        adapter=select_market_adapter(market, fixture=adapter),
+        research=research,
         provider=provider,
         store=LocalParquetStore(settings.storage_root),
         detectors=load_detectors(),
