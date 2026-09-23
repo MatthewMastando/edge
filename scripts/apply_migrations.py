@@ -52,7 +52,7 @@ def apply_migrations(database_url: str, *, seed: bool = False, quiet: bool = Fal
                     raise RuntimeError(msg)
                 continue
             with conn.transaction():
-                conn.execute(path.read_text(encoding="utf-8"))  # type: ignore[arg-type]
+                conn.execute(path.read_text(encoding="utf-8"))
                 conn.execute(
                     "insert into public.schema_migrations (version, checksum) values (%s, %s)",
                     (version, checksum),
@@ -62,7 +62,7 @@ def apply_migrations(database_url: str, *, seed: bool = False, quiet: bool = Fal
                 print(f"applied {path.name}")
         if seed and SEED_FILE.is_file():
             with conn.transaction():
-                conn.execute(SEED_FILE.read_text(encoding="utf-8"))  # type: ignore[arg-type]
+                conn.execute(SEED_FILE.read_text(encoding="utf-8"))
             if not quiet:
                 print(f"applied {SEED_FILE.name}")
     return applied
