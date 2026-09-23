@@ -55,7 +55,13 @@ from trading_core.storage.schemas import (
     table_to_trades,
     trades_to_table,
 )
-from trading_core.ta import Detector, DetectorInput, DetectorRegistry, InsufficientDataError
+from trading_core.ta import (
+    CALC_VERSION,
+    Detector,
+    DetectorInput,
+    DetectorRegistry,
+    InsufficientDataError,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection
@@ -736,31 +742,36 @@ class ResearchWorkflow:
         run_id = _required_uuid(checkpoint.run_id, "run")
         structured = cast("dict[str, JsonValue]", thesis.model_dump(mode="json"))
         async with self._deps.engine.begin() as conn:
-            artifact_id = checkpoint.artifact_id
-            if artifact_id is None:
-                artifact_id = await artifacts.insert_artifact(
+            existing = await artifacts.generated_revision_for_run(conn, run_id)
+            if existing is not None:
+                revision_id, artifact_id = existing
+            else:
+                stored_artifact_id = checkpoint.artifact_id
+                if stored_artifact_id is None:
+                    stored_artifact_id = await artifacts.insert_artifact(
+                        conn,
+                        owner_id=owner_id,
+                        conversation_id=job.conversation_id,
+                        kind="thesis",
+                        title=f"{payload.symbol} research",
+                        instrument_id=thesis.instrument_id,
+                        contract_code=thesis.contract_code,
+                        tags=["research", payload.symbol]
+                        + (["demonstration"] if thesis.is_demonstration else []),
+                    )
+                artifact_id = stored_artifact_id
+                revision_id, _number = await artifacts.insert_revision(
                     conn,
-                    owner_id=owner_id,
-                    conversation_id=job.conversation_id,
-                    kind="thesis",
-                    title=f"{payload.symbol} research",
-                    instrument_id=thesis.instrument_id,
-                    contract_code=thesis.contract_code,
-                    tags=["research", payload.symbol]
-                    + (["demonstration"] if thesis.is_demonstration else []),
+                    artifact_id=artifact_id,
+                    parent_revision_id=None,
+                    run_id=run_id,
+                    structured=structured,
+                    presentation_markdown=thesis.presentation_markdown,
+                    change_kind="generated",
+                    created_by="agent",
+                    is_demonstration=thesis.is_demonstration,
+                    provenance=thesis.provenance,
                 )
-            revision_id, _number = await artifacts.insert_revision(
-                conn,
-                artifact_id=artifact_id,
-                parent_revision_id=None,
-                run_id=run_id,
-                structured=structured,
-                presentation_markdown=thesis.presentation_markdown,
-                change_kind="generated",
-                created_by="agent",
-                is_demonstration=thesis.is_demonstration,
-                provenance=thesis.provenance,
-            )
             await artifacts.set_current_revision(conn, artifact_id, revision_id)
             await jobs.update_run(
                 conn,
@@ -785,8 +796,7 @@ class ResearchWorkflow:
                 checkpoint=dump_checkpoint(updated),
                 lease_seconds=self._deps.lease_seconds,
             )
-        if not saved:
-            raise LeaseLostError(str(job.id))
+            _raise_if_lease_lost(saved, job.id)
         return updated
 
     async def _notify(
@@ -826,8 +836,7 @@ class ResearchWorkflow:
                 checkpoint=dump_checkpoint(updated),
                 lease_seconds=self._deps.lease_seconds,
             )
-        if not saved:
-            raise LeaseLostError(str(job.id))
+            _raise_if_lease_lost(saved, job.id)
         if self._deps.progress is not None:
             await self._deps.progress(
                 ProgressEvent(
@@ -918,16 +927,19 @@ class ResearchWorkflow:
             return checkpoint
         provenance = "recorded" if self._deps.provider.name == "recorded" else "fixture"
         async with self._deps.engine.begin() as conn:
-            run = await jobs.insert_run(
-                conn,
-                job_id=job.id,
-                conversation_id=job.conversation_id,
-                provider=self._deps.provider.name,
-                provenance=provenance,
-                model=self._deps.model,
-                prompt_version=PROMPT_VERSION,
-            )
-            updated = checkpoint.model_copy(update={"run_id": run.id})
+            run_id = await jobs.earliest_run_id(conn, job.id)
+            if run_id is None:
+                run = await jobs.insert_run(
+                    conn,
+                    job_id=job.id,
+                    conversation_id=job.conversation_id,
+                    provider=self._deps.provider.name,
+                    provenance=provenance,
+                    model=self._deps.model,
+                    prompt_version=PROMPT_VERSION,
+                )
+                run_id = run.id
+            updated = checkpoint.model_copy(update={"run_id": run_id})
             saved = await jobs.save_checkpoint(
                 conn,
                 job_id=job.id,
@@ -935,8 +947,7 @@ class ResearchWorkflow:
                 checkpoint=dump_checkpoint(updated),
                 lease_seconds=self._deps.lease_seconds,
             )
-        if not saved:
-            raise LeaseLostError(str(job.id))
+            _raise_if_lease_lost(saved, job.id)
         return updated
 
     async def _save(self, job: Job, checkpoint: ResearchCheckpoint) -> None:
@@ -948,6 +959,7 @@ class ResearchWorkflow:
                 checkpoint=dump_checkpoint(checkpoint),
                 lease_seconds=self._deps.lease_seconds,
             )
+            _raise_if_lease_lost(saved, job.id)
             if checkpoint.run_id is not None:
                 await jobs.update_run(
                     conn,
@@ -957,8 +969,6 @@ class ResearchWorkflow:
                     stages_completed=list(checkpoint.stages_completed),
                     usage=_usage(checkpoint),
                 )
-        if not saved:
-            raise LeaseLostError(str(job.id))
 
     async def _note(
         self, job: Job, checkpoint: ResearchCheckpoint, stage: str, message: str
@@ -983,8 +993,7 @@ class ResearchWorkflow:
                 checkpoint=dump_checkpoint(updated),
                 lease_seconds=self._deps.lease_seconds,
             )
-        if not saved:
-            raise LeaseLostError(str(job.id))
+            _raise_if_lease_lost(saved, job.id)
         if self._deps.progress is not None:
             await self._deps.progress(
                 ProgressEvent(
@@ -1009,6 +1018,8 @@ class ResearchWorkflow:
                 last_error=reason,
                 scheduled_for=scheduled,
             )
+            if updated is None:
+                raise LeaseLostError(str(job.id))
             if checkpoint.run_id is not None:
                 await jobs.update_run(
                     conn,
@@ -1019,8 +1030,6 @@ class ResearchWorkflow:
                     usage=_usage(checkpoint),
                     error=reason,
                 )
-        if updated is None:
-            raise LeaseLostError(str(job.id))
         raise WorkflowPausedError(reason)
 
     async def _finish(self, job: Job, checkpoint: ResearchCheckpoint) -> None:
@@ -1034,6 +1043,8 @@ class ResearchWorkflow:
                 checkpoint=dump_checkpoint(checkpoint),
                 last_error=checkpoint.stop_reason,
             )
+            if updated is None:
+                raise LeaseLostError(str(job.id))
             if checkpoint.run_id is not None:
                 await jobs.update_run(
                     conn,
@@ -1045,8 +1056,6 @@ class ResearchWorkflow:
                     finished=True,
                     error=checkpoint.stop_reason,
                 )
-        if updated is None:
-            raise LeaseLostError(str(job.id))
         if self._deps.progress is not None and checkpoint.run_id is not None:
             await self._deps.progress(
                 ProgressEvent(
@@ -1157,12 +1166,22 @@ async def _persist_output(
 
 
 def _lookup(registry: DetectorRegistry, name: str) -> Detector | None:
-    matches = [key for key in registry.names() if key.split("@", 1)[0] == name]
-    if not matches:
+    """Only calc 1.0.0. A later registered version must not replace this slice."""
+    try:
+        return registry.get(cast("DetectorName", name), CALC_VERSION)
+    except KeyError:
         return None
-    chosen = max(matches)
-    detector_name, version = chosen.split("@", 1)
-    return registry.get(cast("DetectorName", detector_name), version)
+
+
+def _raise_if_lease_lost(saved: bool, job_id: UUID) -> None:
+    """Call before the writing transaction closes.
+
+    ``save_checkpoint`` returns false when this worker no longer owns the row. Raising after
+    the context manager commits the insert and leaves a run, revision, or alert the checkpoint
+    does not know about.
+    """
+    if not saved:
+        raise LeaseLostError(str(job_id))
 
 
 def _asset(value: str | None) -> AssetClass:

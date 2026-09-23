@@ -17,7 +17,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import JsonValue
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from tests.conftest import FIXTURES_DIR, REPO_ROOT
 from trading_api.auth import LOCAL_DEV_USER_ID
@@ -264,6 +264,96 @@ async def test_recorded_workflow_resumes_without_duplicate_artifacts(
     async with engine.begin() as conn:
         third = await jobs.lease_job(conn, job_id=job.id, worker_id="resume-3", lease_seconds=30)
     assert third is None
+
+
+async def test_lost_lease_during_persist_does_not_keep_a_second_revision(
+    engine: AsyncEngine, generated_dir: Path, tmp_path: Path
+) -> None:
+    """A failed checkpoint save must roll back the revision. Resume writes that one revision."""
+    job = await _enqueue(engine, key=f"lease-loss-{uuid.uuid4()}")
+    original = jobs.save_checkpoint
+    failed = False
+
+    async def fail_the_persist_save(
+        conn: AsyncConnection,
+        *,
+        job_id: UUID,
+        worker_id: str,
+        checkpoint: dict[str, JsonValue],
+        lease_seconds: int,
+    ) -> bool:
+        nonlocal failed
+        if not failed and checkpoint.get("revision_id") is not None:
+            failed = True
+            return False
+        return await original(
+            conn,
+            job_id=job_id,
+            worker_id=worker_id,
+            checkpoint=checkpoint,
+            lease_seconds=lease_seconds,
+        )
+
+    jobs.save_checkpoint = fail_the_persist_save
+    try:
+        deps = _deps(engine, generated_dir, tmp_path, worker_id="lease-loss")
+        async with engine.begin() as conn:
+            leased = await jobs.lease_job(
+                conn, job_id=job.id, worker_id="lease-loss", lease_seconds=60
+            )
+        assert leased is not None
+        stopped = await run_leased_job(deps, leased)
+    finally:
+        jobs.save_checkpoint = original
+
+    assert failed is True
+    assert stopped.state == "running"
+    assert stopped.checkpoint.get("revision_id") is None
+    run_id = UUID(str(stopped.checkpoint["run_id"]))
+    async with engine.begin() as conn:
+        revisions = await fetch_one(
+            conn,
+            "select count(*) as n from artifact_revisions where run_id = :run_id",
+            {"run_id": run_id},
+        )
+        runs = await fetch_one(
+            conn, "select count(*) as n from runs where job_id = :job_id", {"job_id": job.id}
+        )
+        released = await jobs.set_state(
+            conn,
+            job_id=job.id,
+            worker_id="lease-loss",
+            state="partial",
+            checkpoint=stopped.checkpoint,
+            last_error="lease lost during persist",
+        )
+    assert revisions is not None and as_int(revisions["n"]) == 0
+    assert runs is not None and as_int(runs["n"]) == 1
+    assert released is not None and released.state == "partial"
+
+    deps.worker_id = "lease-resume"
+    async with engine.begin() as conn:
+        resumed = await jobs.lease_job(
+            conn, job_id=job.id, worker_id="lease-resume", lease_seconds=60
+        )
+    assert resumed is not None
+    finished = await run_leased_job(deps, resumed)
+    assert finished.state == "completed"
+    assert finished.checkpoint.get("run_id") == str(run_id)
+    await _assert_saved_calculations(engine, finished.checkpoint["thesis"])
+    async with engine.begin() as conn:
+        revisions = await fetch_one(
+            conn,
+            "select count(*) as n from artifact_revisions where run_id = :run_id",
+            {"run_id": run_id},
+        )
+        runs = await fetch_one(
+            conn, "select count(*) as n from runs where job_id = :job_id", {"job_id": job.id}
+        )
+        notes = await jobs.count_notifications(conn, f"research:{job.id}:result")
+    assert revisions is not None and as_int(revisions["n"]) == 1
+    assert runs is not None and as_int(runs["n"]) == 1
+    assert notes == 1
 
 
 async def test_budget_ceiling_stops_the_run(

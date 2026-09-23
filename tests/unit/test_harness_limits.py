@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from trading_core.domain.common import CalcVersion
 from trading_core.harness.provider import ToolSpec
 from trading_core.harness.secrets import redact
 from trading_core.harness.thesis_builder import assemble_thesis
@@ -19,6 +20,27 @@ from trading_core.harness.tools import (
     redact_json,
 )
 from trading_core.harness.validation import repair_thesis, validate_thesis
+from trading_core.harness.workflow import _lookup
+from trading_core.ta import CALC_VERSION, DetectorRegistry
+from trading_core.ta.detectors.fvg import FvgDetector
+
+
+class _LaterFvg(FvgDetector):
+    @property
+    def calc_version(self) -> CalcVersion:
+        return "9.9.9"
+
+
+def test_detector_lookup_stays_on_calc_1_0_0() -> None:
+    registry = DetectorRegistry()
+    registry.register(_LaterFvg())
+    assert _lookup(registry, "fvg") is None
+    current = FvgDetector()
+    registry.register(current)
+    found = _lookup(registry, "fvg")
+    assert found is current
+    assert found is not None
+    assert found.calc_version == CALC_VERSION
 
 
 def test_registry_keeps_order_block_and_rejects_order_writes() -> None:
