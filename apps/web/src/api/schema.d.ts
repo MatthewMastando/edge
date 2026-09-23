@@ -21,6 +21,95 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/v1/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Artifacts */
+        get: operations["listArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/artifacts/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Artifact */
+        get: operations["getArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/artifacts/{artifact_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Draft */
+        get: operations["getArtifactDraft"];
+        /**
+         * Save Draft
+         * @description Autosave the editable presentation. This does not create a revision.
+         */
+        put: operations["saveArtifactDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/artifacts/{artifact_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revisions */
+        get: operations["listArtifactRevisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/artifacts/{artifact_id}/revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Revision */
+        get: operations["getArtifactRevision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bars": {
         parameters: {
             query?: never;
@@ -55,6 +144,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/v1/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Chat */
+        post: operations["postChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/futures-contracts": {
         parameters: {
             query?: never;
@@ -81,6 +187,74 @@ export type paths = {
         };
         /** List Instruments */
         get: operations["listInstruments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["listRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["getRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Run Events */
+        get: operations["listRunEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Workspace */
+        get: operations["searchWorkspace"];
         put?: never;
         post?: never;
         delete?: never;
@@ -151,6 +325,80 @@ export type components = {
             provenance: "fixture" | "recorded" | "live";
             /** Provider */
             provider: string;
+        };
+        /** ArtifactDetail */
+        ArtifactDetail: {
+            /** Contract Code */
+            contract_code?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Revision Id */
+            current_revision_id?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instrument Id */
+            instrument_id?: string | null;
+            /** Kind */
+            kind: string;
+            /** Tags */
+            tags?: string[];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ArtifactHit */
+        ArtifactHit: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ArtifactSummary */
+        ArtifactSummary: {
+            /** Contract Code */
+            contract_code?: string | null;
+            /** Current Revision Id */
+            current_revision_id?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instrument Id */
+            instrument_id?: string | null;
+            /** Kind */
+            kind: string;
+            /** Tags */
+            tags?: string[];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * Bar
@@ -286,6 +534,48 @@ export type components = {
              */
             source_id: string | null;
         };
+        /** ChatRequest */
+        ChatRequest: {
+            /**
+             * Client Message Id
+             * @description Retries with the same id reuse the existing job instead of starting another.
+             */
+            client_message_id?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /**
+             * Horizon
+             * @default 2-5 sessions
+             */
+            horizon: string;
+            /** Message */
+            message: string;
+            /** Recording Id */
+            recording_id?: string | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Timeframe
+             * @default 5m
+             * @enum {string}
+             */
+            timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+        };
+        /** ConversationHit */
+        ConversationHit: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** CorrelatedMarket */
         CorrelatedMarket: {
             /**
@@ -311,6 +601,35 @@ export type components = {
              * @default null
              */
             window_bars: number | null;
+        };
+        /** DraftBody */
+        DraftBody: {
+            /** Base Revision Id */
+            base_revision_id?: string | null;
+            /** Presentation Markdown */
+            presentation_markdown?: string | null;
+            /** Structured */
+            structured?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+        };
+        /** DraftResponse */
+        DraftResponse: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Base Revision Id */
+            base_revision_id?: string | null;
+            /** Presentation Markdown */
+            presentation_markdown?: string | null;
+            /** Structured */
+            structured?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /**
          * EvidenceItem
@@ -960,6 +1279,69 @@ export type components = {
             tool_calls?: components["schemas"]["ToolCall"][];
             usage: components["schemas"]["Usage"];
         };
+        /** RevisionDetail */
+        RevisionDetail: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /** Change Kind */
+            change_kind: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Demonstration */
+            is_demonstration: boolean;
+            /** Parent Revision Id */
+            parent_revision_id?: string | null;
+            /** Presentation Markdown */
+            presentation_markdown: string;
+            /** Provenance */
+            provenance: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Run Id */
+            run_id?: string | null;
+            /** Structured */
+            structured: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+        };
+        /** RevisionSummary */
+        RevisionSummary: {
+            /** Change Kind */
+            change_kind: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Demonstration */
+            is_demonstration: boolean;
+            /** Presentation Markdown */
+            presentation_markdown: string;
+            /** Provenance */
+            provenance: string;
+            /** Revision Number */
+            revision_number: number;
+        };
         /**
          * RiskCalculation
          * @description Hypothetical cost and risk figures. Futures amounts use verified point/tick values.
@@ -1061,31 +1443,16 @@ export type components = {
          * @description One execution of a job. A run produces at most one artifact revision.
          */
         Run: {
-            /**
-             * Artifact Revision Id
-             * @default null
-             */
-            artifact_revision_id: string | null;
-            /**
-             * Conversation Id
-             * @default null
-             */
-            conversation_id: string | null;
-            /**
-             * Current Stage
-             * @default null
-             */
-            current_stage: ("resolve_instrument" | "capture_snapshot" | "deterministic_ta" | "gather_context" | "synthesize" | "critique" | "validate" | "repair" | "persist" | "notify") | null;
-            /**
-             * Error
-             * @default null
-             */
-            error: string | null;
-            /**
-             * Finished At
-             * @default null
-             */
-            finished_at: string | null;
+            /** Artifact Revision Id */
+            artifact_revision_id?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+            /** Current Stage */
+            current_stage?: ("resolve_instrument" | "capture_snapshot" | "deterministic_ta" | "gather_context" | "synthesize" | "critique" | "validate" | "repair" | "persist" | "notify") | null;
+            /** Error */
+            error?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
             /**
              * Id
              * Format: uuid
@@ -1096,16 +1463,10 @@ export type components = {
              * Format: uuid
              */
             job_id: string;
-            /**
-             * Model
-             * @default null
-             */
-            model: string | null;
-            /**
-             * Prompt Version
-             * @default null
-             */
-            prompt_version: string | null;
+            /** Model */
+            model?: string | null;
+            /** Prompt Version */
+            prompt_version?: string | null;
             /**
              * Provenance
              * @enum {string}
@@ -1156,11 +1517,17 @@ export type components = {
             run_id: string;
             /** Sequence */
             sequence: number;
-            /**
-             * Stage
-             * @default null
-             */
-            stage: ("resolve_instrument" | "capture_snapshot" | "deterministic_ta" | "gather_context" | "synthesize" | "critique" | "validate" | "repair" | "persist" | "notify") | null;
+            /** Stage */
+            stage?: ("resolve_instrument" | "capture_snapshot" | "deterministic_ta" | "gather_context" | "synthesize" | "critique" | "validate" | "repair" | "persist" | "notify") | null;
+        };
+        /** SearchResponse */
+        SearchResponse: {
+            /** Artifacts */
+            artifacts?: components["schemas"]["ArtifactHit"][];
+            /** Conversations */
+            conversations?: components["schemas"]["ConversationHit"][];
+            /** Query */
+            query: string;
         };
         /**
          * SessionCalendar
@@ -1803,11 +2170,8 @@ export type components = {
         };
         /** Usage */
         Usage: {
-            /**
-             * Actual Cost Usd
-             * @default null
-             */
-            actual_cost_usd: string | null;
+            /** Actual Cost Usd */
+            actual_cost_usd?: string | null;
             /**
              * Input Tokens
              * @default 0
@@ -1902,6 +2266,199 @@ export interface operations {
             };
         };
     };
+    listArtifacts: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getArtifactDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saveArtifactDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listArtifactRevisions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getArtifactRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     getBars: {
         parameters: {
             query: {
@@ -1957,6 +2514,39 @@ export interface operations {
             };
         };
     };
+    postChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listFuturesContracts: {
         parameters: {
             query?: {
@@ -2004,6 +2594,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Instrument"][];
+                };
+            };
+        };
+    };
+    listRuns: {
+        parameters: {
+            query?: {
+                conversation_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listRunEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunEvent"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    searchWorkspace: {
+        parameters: {
+            query: {
+                limit?: number;
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

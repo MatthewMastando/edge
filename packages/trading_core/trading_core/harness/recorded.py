@@ -29,6 +29,10 @@ class Recording(DomainModel):
     description: str
     match: RecordingMatch = Field(default_factory=RecordingMatch)
     response: ModelResponse
+    follow_ups: list[ModelResponse] = Field(
+        default_factory=list,
+        description="Later turns, selected by how many tool results the request already carries.",
+    )
 
 
 class NoRecordingError(LookupError):
@@ -39,9 +43,10 @@ class RecordedProvider:
     def __init__(self, recordings: list[Recording]) -> None:
         self._recordings = {r.id: r for r in recordings}
         for recording in recordings:
-            if (
-                recording.response.provenance != "recorded"
-                or not recording.response.is_demonstration
+            responses = [recording.response, *recording.follow_ups]
+            if any(
+                response.provenance != "recorded" or not response.is_demonstration
+                for response in responses
             ):
                 msg = f"recording {recording.id!r} must be labeled recorded/demonstration"
                 raise ValueError(msg)
@@ -80,6 +85,28 @@ class RecordedProvider:
         msg = "no recording matches the request; pass recording_id or add a recording"
         raise NoRecordingError(msg)
 
-    async def respond(self, request: ModelRequest) -> ModelResponse:
+    def _labeled(self, response: ModelResponse) -> ModelResponse:
+        """Every replay is demonstration output, including follow-up turns."""
+        return response.model_copy(
+            update={
+                "provider": RECORDED_PROVIDER_NAME,
+                "provenance": "recorded",
+                "is_demonstration": True,
+            }
+        )
+
+    def response_for(self, request: ModelRequest) -> ModelResponse:
         recording = self.select(request)
-        return recording.response.model_copy(update={"provider": RECORDED_PROVIDER_NAME})
+        step = len(request.tool_results)
+        if step <= 0:
+            chosen = recording.response
+        elif step - 1 < len(recording.follow_ups):
+            chosen = recording.follow_ups[step - 1]
+        else:
+            chosen = recording.response.model_copy(
+                update={"tool_calls": [], "finish_reason": "stop"}
+            )
+        return self._labeled(chosen)
+
+    async def respond(self, request: ModelRequest) -> ModelResponse:
+        return self.response_for(request)

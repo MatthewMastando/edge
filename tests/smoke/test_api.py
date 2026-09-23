@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 
@@ -86,4 +87,21 @@ def test_live_mode_refuses_unauthenticated_requests(generated_dir: Path) -> None
         assert http.get("/health").status_code == 200
         assert http.get("/v1/instruments").status_code == 401
         with_token = http.get("/v1/instruments", headers={"Authorization": "Bearer t"})
-        assert with_token.status_code == 501
+        assert with_token.status_code == 401
+
+
+def test_live_mode_without_a_secret_does_not_accept_tokens(generated_dir: Path) -> None:
+    settings = ApiSettings(mode="live", fixtures_root=generated_dir, supabase_jwt_secret="")
+    with TestClient(create_app(settings)) as http:
+        response = http.get("/v1/instruments", headers={"Authorization": "Bearer t"})
+        assert response.status_code == 501
+
+
+def test_live_mode_accepts_a_signed_supabase_jwt(generated_dir: Path) -> None:
+    secret = "supabase-test-secret-at-least-32b"
+    user_id = "11111111-1111-4111-8111-111111111111"
+    token = jwt.encode({"sub": user_id, "email": "ada@example.com"}, secret, algorithm="HS256")
+    settings = ApiSettings(mode="live", fixtures_root=generated_dir, supabase_jwt_secret=secret)
+    with TestClient(create_app(settings)) as http:
+        response = http.get("/v1/instruments", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200

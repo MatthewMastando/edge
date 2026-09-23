@@ -1,8 +1,7 @@
 """Worker entrypoint.
 
-Stage 0 ships the process skeleton: settings, signal handling, a poll loop and the handler
-registry contract. Stage 1B implements lease acquisition (``select ... for update skip locked``),
-checkpointed workflow stages and the state-machine updates against ``public.jobs``.
+Leases queued and partial jobs with ``FOR UPDATE SKIP LOCKED``, then runs the checkpointed
+research workflow. A paused job has no lease, so the next poll can resume it.
 """
 
 from __future__ import annotations
@@ -15,6 +14,16 @@ import signal
 import sys
 from typing import TYPE_CHECKING, Protocol
 
+from trading_core.data.fixture import FixtureAdapter
+from trading_core.harness.deps import WorkflowDeps
+from trading_core.harness.factory import load_model_provider
+from trading_core.harness.limits import ResearchLimits
+from trading_core.harness.runner import run_leased_job
+from trading_core.harness.secrets import secrets_from_environ
+from trading_core.storage.db import Database
+from trading_core.storage.local import LocalParquetStore
+from trading_core.storage.repositories import jobs
+from trading_core.ta import DetectorRegistry
 from trading_worker import __version__
 from trading_worker.settings import WorkerSettings, get_settings
 
@@ -51,10 +60,28 @@ class HandlerRegistry:
         return sorted(self._handlers)
 
 
+class ResearchJobHandler:
+    def __init__(self, deps: WorkflowDeps) -> None:
+        self._deps = deps
+
+    @property
+    def kind(self) -> JobKind:
+        return "research"
+
+    async def run(self, job: Job) -> None:
+        await run_leased_job(self._deps, job)
+
+
 class Worker:
-    def __init__(self, settings: WorkerSettings, registry: HandlerRegistry) -> None:
+    def __init__(
+        self,
+        settings: WorkerSettings,
+        registry: HandlerRegistry,
+        database: Database | None,
+    ) -> None:
         self._settings = settings
         self._registry = registry
+        self._database = database
         self._stop = asyncio.Event()
         self.iterations = 0
 
@@ -62,11 +89,30 @@ class Worker:
         self._stop.set()
 
     async def poll_once(self) -> int:
-        """Lease and run available jobs. Returns the number of jobs processed (0 in Stage 0)."""
+        """Lease and run at most one job. Returns 1 when a job was taken."""
         self.iterations += 1
-        if not self._registry.kinds():
+        kinds = self._registry.kinds()
+        if self._database is None or not kinds:
             log.debug("no handlers registered; idle")
-        return 0
+            return 0
+        async with self._database.engine.begin() as conn:
+            expired = await jobs.requeue_expired(conn)
+            if expired:
+                log.info("requeued %d expired lease(s)", expired)
+            job = await jobs.lease_next(
+                conn,
+                worker_id=self._settings.effective_worker_id,
+                lease_seconds=self._settings.lease_seconds,
+                kinds=kinds,
+            )
+        if job is None:
+            return 0
+        handler = self._registry.get(job.kind)
+        if handler is None:
+            log.error("leased %s but no handler is registered", job.kind)
+            return 0
+        await handler.run(job)
+        return 1
 
     async def run(self, *, once: bool = False) -> None:
         log.info(
@@ -87,20 +133,65 @@ class Worker:
                     )
         log.info("trading-worker stopped after %d poll(s)", self.iterations)
 
+    async def close(self) -> None:
+        if self._database is not None:
+            await self._database.dispose()
 
-def build_registry() -> HandlerRegistry:
-    """Stage 1B registers research/ta_scan/snapshot handlers here."""
-    return HandlerRegistry()
+
+def _limits(settings: WorkerSettings) -> ResearchLimits:
+    return ResearchLimits(
+        max_external_retrievals=settings.max_external_retrievals,
+        max_evidence_tokens=settings.max_evidence_tokens,
+        max_model_iterations=settings.max_model_iterations,
+        max_repair_attempts=settings.max_repair_attempts,
+        timeout_seconds=settings.timeout_seconds,
+        monthly_ai_search_usd=settings.monthly_ai_search_usd,
+        llm_reserve_usd=settings.llm_reserve_usd,
+        retrieval_reserve_usd=settings.retrieval_reserve_usd,
+    )
+
+
+def build_worker(settings: WorkerSettings) -> Worker:
+    """Register research when fixture data is present. Missing fixtures idle without a database."""
+    registry = HandlerRegistry()
+    try:
+        adapter = FixtureAdapter(settings.fixtures_root)
+    except FileNotFoundError:
+        log.warning("fixture manifest not found at %s; worker will idle", settings.fixtures_root)
+        return Worker(settings, registry, None)
+    database = Database(settings.database_url)
+    provider = load_model_provider(
+        provider=settings.llm_provider,
+        recordings_root=settings.llm_recordings_root,
+        model=settings.llm_model or None,
+    )
+    deps = WorkflowDeps(
+        engine=database.engine,
+        adapter=adapter,
+        provider=provider,
+        store=LocalParquetStore(settings.storage_root),
+        detectors=DetectorRegistry(),
+        limits=_limits(settings),
+        worker_id=settings.effective_worker_id,
+        lease_seconds=settings.lease_seconds,
+        model=settings.llm_model or None,
+        secrets=secrets_from_environ(),
+    )
+    registry.register(ResearchJobHandler(deps))
+    return Worker(settings, registry, database)
 
 
 async def _amain(once: bool) -> None:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
-    worker = Worker(settings, build_registry())
+    worker = build_worker(settings)
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, worker.request_stop)
-    await worker.run(once=once)
+    try:
+        await worker.run(once=once)
+    finally:
+        await worker.close()
 
 
 def main(argv: list[str] | None = None) -> int:

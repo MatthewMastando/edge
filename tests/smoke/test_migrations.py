@@ -155,6 +155,10 @@ def test_jobs_state_machine_is_enforced(migrated: str) -> None:
             (job_id,),
         )
         conn.execute("update jobs set state = 'partial' where id = %s", (job_id,))
+        (lease_until, partial_owner) = conn.execute(
+            "select lease_until, leased_by from jobs where id = %s", (job_id,)
+        ).fetchone()  # type: ignore[misc]
+        assert lease_until is None and partial_owner is None
         conn.execute("update jobs set state = 'budget_exceeded' where id = %s", (job_id,))
         with pytest.raises(errors.CheckViolation):
             conn.execute("update jobs set state = 'queued' where id = %s", (job_id,))

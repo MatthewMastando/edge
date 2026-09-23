@@ -109,7 +109,8 @@ uv run trading-core fixtures show
 - Money, prices, sizes: `numeric`. No floats anywhere in the schema (tested).
 - `jobs.state` machine `queued → running → {partial, completed, failed, cancelled,
   budget_exceeded}` with `running → queued` on lease expiry, enforced by a trigger; leases via
-  `lease_until`/`leased_by`, resumable `checkpoint`, unique `idempotency_key`.
+  `lease_until`/`leased_by`, resumable `checkpoint`, unique `idempotency_key`. Moving a job to
+  `partial` or back to `queued` clears the lease so the row can be claimed again.
 - `ta_events` unique on `(instrument_id, contract_code, timeframe, detector, calc_version,
   origin_time, data_revision)` so re-detection is idempotent and later bars never rewrite an
   earlier log. The row's `event_type` is `confirmed`. Post-confirmation lifecycle (touch, fill,

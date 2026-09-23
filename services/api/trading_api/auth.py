@@ -1,8 +1,7 @@
-"""Authentication seam. Stage 1B verifies Supabase JWTs here; Stage 0 only defines the contract.
+"""Authentication. Fixture mode with no JWT secret uses one local development user.
 
-In fixture mode with no JWT secret configured the API serves a single local development user so
-the web app and tests work against `uvicorn` bound to localhost. Any other configuration refuses
-requests until verification is implemented, so nothing can be exposed unauthenticated by accident.
+Live mode verifies a Supabase HS256 JWT. The secret stays in server settings and is never
+written to logs or model context.
 """
 
 from __future__ import annotations
@@ -10,6 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
+import jwt
 from fastapi import Depends, HTTPException, Request, status
 from pydantic import Field
 
@@ -27,15 +27,57 @@ class CurrentUser(DomainModel):
     )
 
 
+def _bearer(request: Request) -> str | None:
+    header = request.headers.get("authorization")
+    if header is None:
+        return None
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
+
+
+def _user_from_jwt(token: str, secret: str) -> CurrentUser:
+    try:
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            options={"verify_aud": False, "require": ["sub"]},
+        )
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        ) from exc
+    subject = payload.get("sub")
+    if not isinstance(subject, str):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    try:
+        user_id = UUID(subject)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        ) from exc
+    email = payload.get("email")
+    return CurrentUser(
+        id=user_id,
+        email=email if isinstance(email, str) else None,
+        is_local_dev=False,
+    )
+
+
 def current_user(request: Request, settings: SettingsDep) -> CurrentUser:
     if settings.mode == "fixture" and not settings.supabase_jwt_secret:
         return CurrentUser(id=LOCAL_DEV_USER_ID, email=None, is_local_dev=True)
-    if request.headers.get("authorization"):
+    token = _bearer(request)
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if not settings.supabase_jwt_secret:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="JWT verification is implemented in Stage 1B",
+            detail="JWT secret is not configured",
         )
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return _user_from_jwt(token, settings.supabase_jwt_secret)
 
 
 UserDep = Annotated[CurrentUser, Depends(current_user)]
