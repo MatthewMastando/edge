@@ -1,0 +1,207 @@
+# Fixture instruments. Contract metadata mirrors the real listed specifications so that the
+# fixture path exercises the same tick/multiplier/session logic as live data will.
+# Everything generated from this file is labeled provenance=fixture.
+#
+# `fixture:` holds generator-only parameters (starting price, per-trade volatility in ticks,
+# expected trades per 5-minute bar, size distribution). They are not part of the domain model.
+
+instruments:
+  - symbol: "6E"
+    name: "Euro FX Futures"
+    asset_class: futures
+    venue: CME
+    currency: USD
+    tick_size: "0.00005"
+    tick_value: "6.25"
+    multiplier: "125000"
+    session_calendar_id: cme_globex_fx
+    fixture:
+      start_price: "1.17250"
+      step_ticks_sd: 1.1
+      trades_per_bar: 9
+      size_min: 1
+      size_max: 12
+      size_decimals: 0
+
+  - symbol: "GC"
+    name: "Gold Futures"
+    asset_class: futures
+    venue: COMEX
+    currency: USD
+    tick_size: "0.10"
+    tick_value: "10.00"
+    multiplier: "100"
+    session_calendar_id: comex_globex_metals
+    fixture:
+      start_price: "3418.50"
+      step_ticks_sd: 1.6
+      trades_per_bar: 11
+      size_min: 1
+      size_max: 8
+      size_decimals: 0
+
+  - symbol: "CL"
+    name: "Crude Oil (WTI) Futures"
+    asset_class: futures
+    venue: NYMEX
+    currency: USD
+    tick_size: "0.01"
+    tick_value: "10.00"
+    multiplier: "1000"
+    session_calendar_id: nymex_globex_energy
+    fixture:
+      start_price: "64.82"
+      step_ticks_sd: 1.4
+      trades_per_bar: 10
+      size_min: 1
+      size_max: 10
+      size_decimals: 0
+
+  - symbol: "ES"
+    name: "E-mini S&P 500 Futures"
+    asset_class: futures
+    venue: CME
+    currency: USD
+    tick_size: "0.25"
+    tick_value: "12.50"
+    multiplier: "50"
+    session_calendar_id: cme_globex_equity_index
+    fixture:
+      start_price: "6512.25"
+      step_ticks_sd: 1.3
+      trades_per_bar: 14
+      size_min: 1
+      size_max: 25
+      size_decimals: 0
+
+  - symbol: "SPY"
+    name: "SPDR S&P 500 ETF Trust"
+    asset_class: etf
+    venue: ARCA
+    currency: USD
+    tick_size: "0.01"
+    tick_value: "0.01"
+    multiplier: "1"
+    session_calendar_id: us_equity_rth
+    fixture:
+      start_price: "649.37"
+      step_ticks_sd: 1.5
+      trades_per_bar: 16
+      size_min: 100
+      size_max: 1500
+      size_decimals: 0
+      coverage_note: "fixture stand-in for IEX-only equity prints; not consolidated volume"
+
+  - symbol: "BTC-USD"
+    name: "Bitcoin / US Dollar (spot)"
+    asset_class: crypto_spot
+    venue: COINBASE
+    currency: USD
+    base_asset: BTC
+    quote_asset: USD
+    tick_size: "0.01"
+    tick_value: "0.01"
+    multiplier: "1"
+    session_calendar_id: crypto_24x7
+    fixture:
+      start_price: "112840.00"
+      step_ticks_sd: 900
+      trades_per_bar: 12
+      size_min: 0.0005
+      size_max: 0.85
+      size_decimals: 8
+
+futures_contracts:
+  # Euro FX Dec 2026. Physically delivered on the third Wednesday (2026-12-16, a business
+  # day). Trading terminates at 09:16 CT on the second business day before delivery
+  # (Mon 2026-12-14). FX has no COMEX-style first notice day.
+  - contract_code: "6EZ6"
+    root: "6E"
+    exchange: CME
+    contract_month: "2026-12"
+    expiry_date: 2026-12-16
+    last_trade_date: 2026-12-14
+    last_trade_time_local: "09:16:00"
+    first_notice_date: null
+    tick_size: "0.00005"
+    tick_value: "6.25"
+    point_multiplier: "125000"
+    currency: USD
+    session_calendar_id: cme_globex_fx
+    settlement_type: physical
+    settlement_time_local: "14:00:00"
+
+  # Gold Dec 2026. Trading terminates 12:30 CT on the third-last business day of the
+  # delivery month. Dec 25 2026 is a holiday; Dec 31, 30 and 29 are business days, so last
+  # trade is 2026-12-29. First notice day is the last business day of the preceding month
+  # (Mon 2026-11-30), not the day before last trade. Delivery can continue through the month.
+  - contract_code: "GCZ6"
+    root: "GC"
+    exchange: COMEX
+    contract_month: "2026-12"
+    expiry_date: 2026-12-29
+    last_trade_date: 2026-12-29
+    last_trade_time_local: "12:30:00"
+    first_notice_date: 2026-11-30
+    tick_size: "0.10"
+    tick_value: "10.00"
+    point_multiplier: "100"
+    currency: USD
+    session_calendar_id: comex_globex_metals
+    settlement_type: physical
+    settlement_time_local: "12:30:00"
+
+  # WTI Crude Nov 2026. Trading ceases on the third business day prior to the 25th calendar
+  # day of the month before delivery. 25 Oct 2026 is a Sunday, so the anchor is Fri 23 Oct
+  # and last trade is Tue 2026-10-20, at 13:30 CT (14:30 ET). No separate first notice day;
+  # delivery is ratable across November after termination. expiry_date is that termination.
+  - contract_code: "CLX6"
+    root: "CL"
+    exchange: NYMEX
+    contract_month: "2026-11"
+    expiry_date: 2026-10-20
+    last_trade_date: 2026-10-20
+    last_trade_time_local: "13:30:00"
+    first_notice_date: null
+    tick_size: "0.01"
+    tick_value: "10.00"
+    point_multiplier: "1000"
+    currency: USD
+    session_calendar_id: nymex_globex_energy
+    settlement_type: physical
+    settlement_time_local: "13:30:00"
+
+  # E-mini S&P 500 Dec 2026. Cash settled to the special opening quotation. Trading terminates
+  # 08:30 CT (09:30 ET) on the third Friday (2026-12-18). Daily settlement is the 15:14:30-15:15:00
+  # CT VWAP, which is not the expiration clock.
+  - contract_code: "ESZ6"
+    root: "ES"
+    exchange: CME
+    contract_month: "2026-12"
+    expiry_date: 2026-12-18
+    last_trade_date: 2026-12-18
+    last_trade_time_local: "08:30:00"
+    first_notice_date: null
+    tick_size: "0.25"
+    tick_value: "12.50"
+    point_multiplier: "50"
+    currency: USD
+    session_calendar_id: cme_globex_equity_index
+    settlement_type: cash
+    settlement_time_local: "15:15:00"
+
+# Example roll entries for continuous-series handling. The generator does not produce the prior
+# contracts; these exist so Stage 1A can test roll-window exclusion against real-shaped data.
+roll_maps:
+  - root: "6E"
+    from_contract_code: "6EU6"
+    to_contract_code: "6EZ6"
+    roll_date: 2026-09-14
+    method: back_adjust_difference
+    adjustment: "0.00265"
+  - root: "ES"
+    from_contract_code: "ESU6"
+    to_contract_code: "ESZ6"
+    roll_date: 2026-09-17
+    method: back_adjust_difference
+    adjustment: "58.75"

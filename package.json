@@ -1,0 +1,21 @@
+{
+  "name": "trading-research-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "scripts": {
+    "dev": "pnpm --filter @trw/web dev",
+    "build": "pnpm --filter @trw/web build",
+    "typecheck": "pnpm --filter @trw/web typecheck",
+    "lint": "pnpm --filter @trw/web lint",
+    "test": "pnpm --filter @trw/web test",
+    "contracts:generate": "bash scripts/generate_contracts.sh",
+    "contracts:check": "bash scripts/check_contracts.sh"
+  }
+}

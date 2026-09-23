@@ -1,0 +1,17 @@
+id: us_equity_rth
+name: "US equities — regular trading hours"
+version: "1.0.0"
+timezone: America/New_York
+exchange_calendar_code: XNYS
+trading_days: [mon, tue, wed, thu, fri]
+windows:
+  - name: rth
+    open_time: "09:30:00"
+    close_time: "16:00:00"
+    kind: trading
+  - name: closing_auction
+    open_time: "15:50:00"
+    close_time: "16:00:00"
+    kind: settlement_window
+holidays: []
+notes: "Pre/post-market windows are intentionally excluded from the fixture."

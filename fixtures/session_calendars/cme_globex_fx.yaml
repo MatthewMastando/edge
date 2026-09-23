@@ -1,0 +1,24 @@
+id: cme_globex_fx
+name: "CME Globex — FX futures"
+version: "1.0.0"
+timezone: America/Chicago
+exchange_calendar_code: CMES
+trading_days: [mon, tue, wed, thu, fri]
+# Session date = the calendar day the session closes on. Globex opens 17:00 CT the prior evening
+# (Sunday for the Monday session) and closes 16:00 CT with a 60-minute maintenance break.
+windows:
+  - name: globex
+    open_time: "17:00:00"
+    close_time: "16:00:00"
+    opens_previous_day: true
+    kind: trading
+  - name: maintenance_break
+    open_time: "16:00:00"
+    close_time: "17:00:00"
+    kind: break
+  - name: settlement
+    open_time: "13:59:30"
+    close_time: "14:00:00"
+    kind: settlement_window
+holidays: []
+notes: "Holidays are supplied by exchange_calendars (CMES) in Stage 1A; this fixture window has none."

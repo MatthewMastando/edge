@@ -1,0 +1,35 @@
+{
+  "id": "demo-thesis-6ez6",
+  "description": "Demonstration synthesis for the 6EZ6 fixture. Recorded output; not live research.",
+  "match": {
+    "contains": "6EZ6"
+  },
+  "response": {
+    "response_id": "rec_demo_6ez6_0001",
+    "provider": "recorded",
+    "model": null,
+    "provenance": "recorded",
+    "is_demonstration": true,
+    "output_text": "DEMONSTRATION OUTPUT (recorded, fixture data). Stance: insufficient evidence. The fixture snapshot for 6EZ6 contains synthetic 5-minute bars only; no sourced macro context was retrieved, so no conditional entry, invalidation or target is set.",
+    "output_json": {
+      "stance": "insufficient_evidence",
+      "plan": {
+        "entry": null,
+        "invalidation": null,
+        "target": null,
+        "monitoring_criteria": [],
+        "unset_reason": "Fixture snapshot; no sourced evidence available in this recording."
+      },
+      "missing_data": ["macro calendar", "rate differentials", "positioning"]
+    },
+    "tool_calls": [],
+    "finish_reason": "stop",
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "retrieval_calls": 0,
+      "reserved_cost_usd": "0",
+      "actual_cost_usd": "0"
+    }
+  }
+}

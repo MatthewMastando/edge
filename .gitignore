@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+
+# Node
+node_modules/
+apps/web/dist/
+apps/web/coverage/
+*.tsbuildinfo
+
+# Environment / secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# Generated fixture data (regenerate with `uv run trading-core fixtures generate`)
+fixtures/generated/
+
+# Local Parquet object store (dev/fixture mode)
+.data/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

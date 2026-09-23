@@ -1,0 +1,22 @@
+[project]
+name = "trading-core"
+version = "0.1.0"
+description = "Shared domain models, data adapters, TA/research/harness interfaces and storage for the Trading Research Workspace"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.12,<3",
+    "pyarrow>=21",
+    "numpy>=2.2",
+    "pyyaml>=6",
+    "typer>=0.17",
+]
+
+[project.scripts]
+trading-core = "trading_core.cli:app"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trading_core"]

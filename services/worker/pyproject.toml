@@ -1,0 +1,24 @@
+[project]
+name = "trading-worker"
+version = "0.1.0"
+description = "Worker process for the Trading Research Workspace (leases durable jobs from Postgres and runs workflow stages)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "trading-core",
+    "pydantic-settings>=2.10",
+    "sqlalchemy[asyncio]>=2.0.40",
+    "asyncpg>=0.30",
+]
+
+[project.scripts]
+trading-worker = "trading_worker.main:main"
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trading_worker"]

@@ -1,0 +1,3739 @@
+{
+  "components": {
+    "schemas": {
+      "AdapterCapabilities": {
+        "additionalProperties": false,
+        "description": "What a provider can honestly supply. The UI surfaces this next to every result.",
+        "properties": {
+          "consolidated_equities": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "False for single-exchange (IEX-only) equity feeds.",
+            "title": "Consolidated Equities"
+          },
+          "coverage_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Note"
+          },
+          "has_trades": {
+            "description": "False means exact volume profile is unavailable.",
+            "title": "Has Trades",
+            "type": "boolean"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "provenance",
+          "has_trades"
+        ],
+        "title": "AdapterCapabilities",
+        "type": "object"
+      },
+      "Bar": {
+        "additionalProperties": false,
+        "description": "One completed or forming OHLCV bar. ``origin_time`` is the bar's open time in UTC.",
+        "properties": {
+          "close": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Close",
+            "type": "string"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Listed contract code for futures bars; null otherwise.",
+            "title": "Contract Code"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "high": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "High",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "is_complete": {
+            "default": true,
+            "description": "Only completed bars may produce confirmed signals.",
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "low": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Low",
+            "type": "string"
+          },
+          "open": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Open",
+            "type": "string"
+          },
+          "origin_time": {
+            "format": "date-time",
+            "title": "Origin Time",
+            "type": "string"
+          },
+          "origin_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Origin Tz",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "trade_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Count"
+          },
+          "volume": {
+            "description": "Total traded size in the bar; decimals for crypto.",
+            "format": "decimal",
+            "title": "Volume",
+            "type": "string"
+          },
+          "vwap": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vwap"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "timeframe",
+          "origin_time",
+          "origin_tz",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "data_revision",
+          "provenance"
+        ],
+        "title": "Bar",
+        "type": "object"
+      },
+      "BarSeries": {
+        "additionalProperties": false,
+        "description": "A contiguous run of bars from one snapshot.",
+        "properties": {
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/Bar"
+            },
+            "title": "Bars",
+            "type": "array"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Code"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "timeframe",
+          "data_revision",
+          "provenance",
+          "bars"
+        ],
+        "title": "BarSeries",
+        "type": "object"
+      },
+      "Catalyst": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Note"
+          },
+          "scheduled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Scheduled At"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "Catalyst",
+        "type": "object"
+      },
+      "CorrelatedMarket": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": -1,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Aligned-return correlation when computed.",
+            "title": "Correlation"
+          },
+          "feature_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Feature Id"
+          },
+          "relationship": {
+            "description": "Plain-language description of the linkage.",
+            "title": "Relationship",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "window_bars": {
+            "anyOf": [
+              {
+                "minimum": 2,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Window Bars"
+          }
+        },
+        "required": [
+          "symbol",
+          "relationship"
+        ],
+        "title": "CorrelatedMarket",
+        "type": "object"
+      },
+      "EvidenceItem": {
+        "additionalProperties": false,
+        "description": "A sourced claim. Retrieved content is evidence, never instructions.",
+        "properties": {
+          "claim": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Claim",
+            "type": "string"
+          },
+          "excerpt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Excerpt Id"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Published At"
+          },
+          "retrieved_at": {
+            "format": "date-time",
+            "title": "Retrieved At",
+            "type": "string"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Id"
+          },
+          "stance": {
+            "enum": [
+              "supporting",
+              "opposing"
+            ],
+            "title": "Stance",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          }
+        },
+        "required": [
+          "stance",
+          "claim",
+          "retrieved_at"
+        ],
+        "title": "EvidenceItem",
+        "type": "object"
+      },
+      "FeatureReference": {
+        "additionalProperties": false,
+        "description": "A technical finding that resolves to a saved TA feature and its chart annotation.",
+        "properties": {
+          "annotation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Chart annotation id rendered from the same feature.",
+            "title": "Annotation Id"
+          },
+          "feature_id": {
+            "format": "uuid",
+            "title": "Feature Id",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature_id",
+          "summary"
+        ],
+        "title": "FeatureReference",
+        "type": "object"
+      },
+      "FixtureLabel": {
+        "additionalProperties": false,
+        "description": "Attached to everything produced by the fixture generator so it can never pass as live.",
+        "properties": {
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "generator": {
+            "description": "Generator identifier, e.g. trading_core.fixtures.generator",
+            "title": "Generator",
+            "type": "string"
+          },
+          "generator_version": {
+            "description": "Semantic version of the calculation that produced this object.",
+            "examples": [
+              "1.0.0"
+            ],
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Generator Version",
+            "type": "string"
+          },
+          "notice": {
+            "default": "Synthetic demonstration data generated deterministically from a seed. Not market data. Not investment research.",
+            "title": "Notice",
+            "type": "string"
+          },
+          "provenance": {
+            "const": "fixture",
+            "default": "fixture",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "seed": {
+            "minimum": 0,
+            "title": "Seed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generator",
+          "generator_version",
+          "seed",
+          "data_revision",
+          "generated_at"
+        ],
+        "title": "FixtureLabel",
+        "type": "object"
+      },
+      "FuturesContract": {
+        "additionalProperties": false,
+        "description": "A listed futures contract with the metadata required by spec section 4.",
+        "properties": {
+          "contract_code": {
+            "examples": [
+              "6EZ6",
+              "GCZ6"
+            ],
+            "maxLength": 16,
+            "minLength": 3,
+            "title": "Contract Code",
+            "type": "string"
+          },
+          "contract_month": {
+            "description": "Delivery month as YYYY-MM.",
+            "examples": [
+              "2026-12"
+            ],
+            "pattern": "^\\d{4}-\\d{2}$",
+            "title": "Contract Month",
+            "type": "string"
+          },
+          "currency": {
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Currency",
+            "type": "string"
+          },
+          "exchange": {
+            "examples": [
+              "CME",
+              "COMEX",
+              "NYMEX"
+            ],
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange",
+            "type": "string"
+          },
+          "expiry_date": {
+            "description": "Published expiration date for this root. For FX that is the value/delivery date, which can fall after last trade. For metals, energy and equity index it is the last trade date, not the end of a physical delivery window.",
+            "format": "date",
+            "title": "Expiry Date",
+            "type": "string"
+          },
+          "first_notice_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First notice day for physically delivered contracts; null if not applicable.",
+            "title": "First Notice Date"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "description": "The root instrument this contract belongs to.",
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_trade_date": {
+            "format": "date",
+            "title": "Last Trade Date",
+            "type": "string"
+          },
+          "last_trade_time_local": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clock time in the session calendar's timezone when the expiring contract stops trading. Distinct from the daily settlement time (ES settles at 15:15 CT but stops trading at 08:30 CT on expiration Friday).",
+            "title": "Last Trade Time Local"
+          },
+          "point_multiplier": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Point Multiplier",
+            "type": "string"
+          },
+          "provenance": {
+            "default": "live",
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "root": {
+            "examples": [
+              "6E",
+              "GC",
+              "CL",
+              "ES"
+            ],
+            "maxLength": 8,
+            "minLength": 1,
+            "title": "Root",
+            "type": "string"
+          },
+          "session_calendar_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Session Calendar Id",
+            "type": "string"
+          },
+          "settlement_time_local": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Daily settlement time in the calendar's timezone.",
+            "title": "Settlement Time Local"
+          },
+          "settlement_type": {
+            "enum": [
+              "cash",
+              "physical"
+            ],
+            "title": "Settlement Type",
+            "type": "string"
+          },
+          "tick_size": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Tick Size",
+            "type": "string"
+          },
+          "tick_value": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Tick Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "instrument_id",
+          "root",
+          "contract_code",
+          "exchange",
+          "contract_month",
+          "expiry_date",
+          "last_trade_date",
+          "tick_size",
+          "tick_value",
+          "point_multiplier",
+          "currency",
+          "session_calendar_id",
+          "settlement_type"
+        ],
+        "title": "FuturesContract",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Revision"
+          },
+          "fixtures_loaded": {
+            "title": "Fixtures Loaded",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "fixture",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "order_write_capability": {
+            "const": false,
+            "default": false,
+            "description": "Always false: the MVP has no broker order-write path.",
+            "title": "Order Write Capability",
+            "type": "boolean"
+          },
+          "provenance": {
+            "description": "Provenance of data this deployment serves by default.",
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "mode",
+          "provenance",
+          "fixtures_loaded"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Instrument": {
+        "additionalProperties": false,
+        "description": "A tradable or researchable symbol. Futures roots and continuous series are instruments;\nindividual listed contracts are :class:`FuturesContract` rows that point back here.",
+        "properties": {
+          "asset_class": {
+            "enum": [
+              "futures",
+              "equity",
+              "etf",
+              "crypto_spot",
+              "crypto_futures",
+              "event_contract"
+            ],
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "base_asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Crypto base asset (e.g. BTC) when applicable.",
+            "title": "Base Asset"
+          },
+          "currency": {
+            "examples": [
+              "USD"
+            ],
+            "maxLength": 8,
+            "minLength": 3,
+            "title": "Currency",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_continuous": {
+            "default": false,
+            "description": "True for continuous futures series. Never treat a continuous symbol as a listed contract; volume profiles are never merged across expiries silently.",
+            "title": "Is Continuous",
+            "type": "boolean"
+          },
+          "multiplier": {
+            "description": "Point multiplier: cash value of a one-point move for one unit/contract.",
+            "format": "decimal",
+            "title": "Multiplier",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "provenance": {
+            "default": "live",
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "quote_asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Crypto quote asset (e.g. USD) when applicable.",
+            "title": "Quote Asset"
+          },
+          "session_calendar_id": {
+            "description": "Key into ``session_calendars``.",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Session Calendar Id",
+            "type": "string"
+          },
+          "symbol": {
+            "examples": [
+              "6E",
+              "SPY",
+              "BTC-USD"
+            ],
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "tick_size": {
+            "description": "Minimum price increment in quote units.",
+            "format": "decimal",
+            "title": "Tick Size",
+            "type": "string"
+          },
+          "tick_value": {
+            "description": "Cash value of one tick for one unit/contract, in ``currency``.",
+            "format": "decimal",
+            "title": "Tick Value",
+            "type": "string"
+          },
+          "venue": {
+            "description": "Exchange or venue code, e.g. CME, COMEX, NYMEX, ARCA, COINBASE.",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "asset_class",
+          "venue",
+          "currency",
+          "tick_size",
+          "tick_value",
+          "multiplier",
+          "session_calendar_id"
+        ],
+        "title": "Instrument",
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "checkpoint": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "description": "Stage outputs needed to resume after a restart.",
+            "title": "Checkpoint",
+            "type": "object"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "Deduplicates routine/instrument/feature/confirmation-time combinations.",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "research",
+              "ta_scan",
+              "snapshot_capture",
+              "scheduled_briefing",
+              "hypothesis_check",
+              "csv_import",
+              "maintenance"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Error"
+          },
+          "lease_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Lease Until"
+          },
+          "leased_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Worker id holding the lease.",
+            "title": "Leased By"
+          },
+          "max_attempts": {
+            "default": 3,
+            "minimum": 1,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "payload": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Payload",
+            "type": "object"
+          },
+          "priority": {
+            "default": 0,
+            "description": "Higher runs first.",
+            "title": "Priority",
+            "type": "integer"
+          },
+          "routine_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Routine Id"
+          },
+          "scheduled_for": {
+            "format": "date-time",
+            "title": "Scheduled For",
+            "type": "string"
+          },
+          "scheduled_tz": {
+            "default": "UTC",
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Scheduled Tz",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Started At"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "partial",
+              "completed",
+              "failed",
+              "cancelled",
+              "budget_exceeded"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "idempotency_key",
+          "scheduled_for",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JsonValue": {},
+      "Level": {
+        "additionalProperties": false,
+        "description": "A named price produced by a detector (POC, VAH, zone bounds, swept level ...).",
+        "properties": {
+          "name": {
+            "examples": [
+              "poc",
+              "vah",
+              "val",
+              "zone_upper"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Price",
+            "type": "string"
+          },
+          "role": {
+            "default": "level",
+            "enum": [
+              "level",
+              "zone_upper",
+              "zone_lower",
+              "midpoint",
+              "threshold",
+              "node"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "price"
+        ],
+        "title": "Level",
+        "type": "object"
+      },
+      "MarketSnapshot": {
+        "additionalProperties": false,
+        "description": "An immutable capture of bars and/or trades stored as Parquet. Every TA feature references\nthe snapshot it was computed from through ``data_revision``.",
+        "properties": {
+          "as_of": {
+            "description": "Time the capture was taken.",
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "as_of_tz": {
+            "description": "IANA zone the capture was taken in; ``as_of`` itself is UTC.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of Tz",
+            "type": "string"
+          },
+          "content_hash": {
+            "description": "SHA-256 over the canonical row encoding; detects drift.",
+            "minLength": 16,
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Code"
+          },
+          "coverage_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "e.g. 'IEX-only approximation' for single-exchange equity trades.",
+            "title": "Coverage Note"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "bars",
+              "trades"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "provider": {
+            "examples": [
+              "fixture",
+              "databento",
+              "alpaca",
+              "coinbase"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "range_end": {
+            "format": "date-time",
+            "title": "Range End",
+            "type": "string"
+          },
+          "range_start": {
+            "format": "date-time",
+            "title": "Range Start",
+            "type": "string"
+          },
+          "row_count": {
+            "minimum": 0.0,
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "storage_key": {
+            "description": "Object-store key of the Parquet file.",
+            "title": "Storage Key",
+            "type": "string"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m",
+                  "15m",
+                  "1h",
+                  "4h",
+                  "1d"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Timeframe for bar snapshots; null for trade snapshots.",
+            "title": "Timeframe"
+          }
+        },
+        "required": [
+          "id",
+          "instrument_id",
+          "kind",
+          "range_start",
+          "range_end",
+          "as_of",
+          "as_of_tz",
+          "provider",
+          "provenance",
+          "data_revision",
+          "storage_key",
+          "row_count",
+          "content_hash"
+        ],
+        "title": "MarketSnapshot",
+        "type": "object"
+      },
+      "Message": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "system",
+              "developer",
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tool Call Id"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "Message",
+        "type": "object"
+      },
+      "ModelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "instructions": {
+            "description": "Core model instruction (see spec section 6).",
+            "title": "Instructions",
+            "type": "string"
+          },
+          "max_output_tokens": {
+            "default": 4096,
+            "minimum": 1,
+            "title": "Max Output Tokens",
+            "type": "integer"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Server-configured model name.",
+            "title": "Model"
+          },
+          "recording_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For RecordedProvider: replay this specific recording.",
+            "title": "Recording Id"
+          },
+          "response_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "JSON Schema the model must satisfy (e.g. the Thesis contract).",
+            "title": "Response Schema"
+          },
+          "tool_results": {
+            "items": {
+              "$ref": "#/components/schemas/ToolResult"
+            },
+            "title": "Tool Results",
+            "type": "array"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolSpec"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instructions",
+          "messages"
+        ],
+        "title": "ModelRequest",
+        "type": "object"
+      },
+      "ModelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "finish_reason": {
+            "enum": [
+              "stop",
+              "tool_calls",
+              "length",
+              "content_filter",
+              "error"
+            ],
+            "title": "Finish Reason",
+            "type": "string"
+          },
+          "is_demonstration": {
+            "description": "True for recorded replays; the UI labels the result as demonstration output.",
+            "title": "Is Demonstration",
+            "type": "boolean"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "output_json": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output Json"
+          },
+          "output_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output Text"
+          },
+          "provenance": {
+            "enum": [
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "response_id": {
+            "title": "Response Id",
+            "type": "string"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        },
+        "required": [
+          "response_id",
+          "provider",
+          "model",
+          "provenance",
+          "is_demonstration",
+          "finish_reason",
+          "usage"
+        ],
+        "title": "ModelResponse",
+        "type": "object"
+      },
+      "RiskCalculation": {
+        "additionalProperties": false,
+        "description": "Hypothetical cost and risk figures. Futures amounts use verified point/tick values.",
+        "properties": {
+          "account_currency": {
+            "title": "Account Currency",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "contracts": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contracts"
+          },
+          "estimated_costs": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Estimated Costs"
+          },
+          "is_hypothetical": {
+            "const": true,
+            "default": true,
+            "title": "Is Hypothetical",
+            "type": "boolean"
+          },
+          "point_value": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Point Value"
+          },
+          "reward_to_risk": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reward To Risk"
+          },
+          "risk_per_contract": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Risk Per Contract"
+          },
+          "tick_value": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tick Value"
+          },
+          "total_risk": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Risk"
+          }
+        },
+        "required": [
+          "account_currency"
+        ],
+        "title": "RiskCalculation",
+        "type": "object"
+      },
+      "RollMapEntry": {
+        "additionalProperties": false,
+        "description": "How a continuous series moved from one listed contract to the next.",
+        "properties": {
+          "adjustment": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Additive difference or multiplicative ratio applied to prior history.",
+            "title": "Adjustment"
+          },
+          "from_contract_code": {
+            "title": "From Contract Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "description": "Continuous-series instrument this roll belongs to.",
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "none",
+              "back_adjust_difference",
+              "back_adjust_ratio",
+              "calendar"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "provenance": {
+            "default": "live",
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "roll_date": {
+            "format": "date",
+            "title": "Roll Date",
+            "type": "string"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          },
+          "to_contract_code": {
+            "title": "To Contract Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "instrument_id",
+          "root",
+          "from_contract_code",
+          "to_contract_code",
+          "roll_date",
+          "method"
+        ],
+        "title": "RollMapEntry",
+        "type": "object"
+      },
+      "Run": {
+        "additionalProperties": false,
+        "description": "One execution of a job. A run produces at most one artifact revision.",
+        "properties": {
+          "artifact_revision_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Artifact Revision Id"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Conversation Id"
+          },
+          "current_stage": {
+            "anyOf": [
+              {
+                "enum": [
+                  "resolve_instrument",
+                  "capture_snapshot",
+                  "deterministic_ta",
+                  "gather_context",
+                  "synthesize",
+                  "critique",
+                  "validate",
+                  "repair",
+                  "persist",
+                  "notify"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Current Stage"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Prompt Version"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "stages_completed": {
+            "items": {
+              "enum": [
+                "resolve_instrument",
+                "capture_snapshot",
+                "deterministic_ta",
+                "gather_context",
+                "synthesize",
+                "critique",
+                "validate",
+                "repair",
+                "persist",
+                "notify"
+              ],
+              "type": "string"
+            },
+            "title": "Stages Completed",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "partial",
+              "completed",
+              "failed",
+              "cancelled",
+              "budget_exceeded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        },
+        "required": [
+          "id",
+          "job_id",
+          "status",
+          "provider",
+          "provenance",
+          "usage",
+          "started_at"
+        ],
+        "title": "Run",
+        "type": "object"
+      },
+      "RunEvent": {
+        "additionalProperties": false,
+        "description": "Structured timeline entry streamed to the UI and kept for audit.",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Data",
+            "type": "object"
+          },
+          "level": {
+            "default": "info",
+            "enum": [
+              "debug",
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "enum": [
+                  "resolve_instrument",
+                  "capture_snapshot",
+                  "deterministic_ta",
+                  "gather_context",
+                  "synthesize",
+                  "critique",
+                  "validate",
+                  "repair",
+                  "persist",
+                  "notify"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Stage"
+          }
+        },
+        "required": [
+          "run_id",
+          "sequence",
+          "at",
+          "message"
+        ],
+        "title": "RunEvent",
+        "type": "object"
+      },
+      "SessionCalendar": {
+        "additionalProperties": false,
+        "description": "Versioned session definition referenced by every feature and snapshot.",
+        "properties": {
+          "always_open": {
+            "default": false,
+            "description": "True for 24/7 venues such as spot crypto.",
+            "title": "Always Open",
+            "type": "boolean"
+          },
+          "exchange_calendar_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "exchange_calendars code for holidays (e.g. CMES, XNYS); null for 24/7 venues.",
+            "title": "Exchange Calendar Code"
+          },
+          "holidays": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Holidays",
+            "type": "array"
+          },
+          "id": {
+            "examples": [
+              "cme_globex_fx",
+              "us_equity_rth"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "timezone": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "trading_days": {
+            "items": {
+              "enum": [
+                "mon",
+                "tue",
+                "wed",
+                "thu",
+                "fri",
+                "sat",
+                "sun"
+              ],
+              "type": "string"
+            },
+            "title": "Trading Days",
+            "type": "array"
+          },
+          "version": {
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Version",
+            "type": "string"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/SessionWindow"
+            },
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "timezone",
+          "trading_days",
+          "windows"
+        ],
+        "title": "SessionCalendar",
+        "type": "object"
+      },
+      "SessionWindow": {
+        "additionalProperties": false,
+        "description": "One trading window inside a session day, in the calendar's local timezone.",
+        "properties": {
+          "close_time": {
+            "format": "time",
+            "title": "Close Time",
+            "type": "string"
+          },
+          "kind": {
+            "default": "trading",
+            "description": "'trading' windows produce bars; 'sub_session' windows (e.g. RTH inside Globex) only define session levels.",
+            "enum": [
+              "trading",
+              "sub_session",
+              "break",
+              "settlement_window"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "globex",
+              "rth",
+              "maintenance_break",
+              "settlement"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "open_time": {
+            "format": "time",
+            "title": "Open Time",
+            "type": "string"
+          },
+          "opens_previous_day": {
+            "default": false,
+            "description": "True when the window opens on the calendar day before the session date (e.g. Globex opens 17:00 CT the prior evening).",
+            "title": "Opens Previous Day",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "open_time",
+          "close_time"
+        ],
+        "title": "SessionWindow",
+        "type": "object"
+      },
+      "TAEvent": {
+        "additionalProperties": false,
+        "description": "The idempotent detection row for one feature.\n\nUnique on (instrument, contract_code, timeframe, detector, calc_version, origin_time,\ndata_revision). ``contract_code`` is part of the key so two listed months of one root can\nshare an origin time. ``event_type`` is always ``confirmed``; later lifecycle is a\n:class:`TAFeatureTransition`, which keeps re-detection from rewriting an earlier log.",
+        "properties": {
+          "calc_version": {
+            "description": "Semantic version of the calculation that produced this object.",
+            "examples": [
+              "1.0.0"
+            ],
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Calc Version",
+            "type": "string"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contract Code"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "detector": {
+            "enum": [
+              "volume_profile",
+              "fvg",
+              "liquidity_sweep",
+              "bos",
+              "order_block",
+              "rsi_divergence",
+              "swing_pivot",
+              "liquidity_pool",
+              "atr",
+              "rsi",
+              "vwap",
+              "session_levels",
+              "correlation"
+            ],
+            "title": "Detector",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "bullish",
+              "bearish",
+              "neutral"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "event_time": {
+            "description": "Close time of the bar that produced the event.",
+            "format": "date-time",
+            "title": "Event Time",
+            "type": "string"
+          },
+          "event_type": {
+            "const": "confirmed",
+            "default": "confirmed",
+            "title": "Event Type",
+            "type": "string"
+          },
+          "event_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Event Tz",
+            "type": "string"
+          },
+          "feature_id": {
+            "format": "uuid",
+            "title": "Feature Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/Level"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "origin_time": {
+            "format": "date-time",
+            "title": "Origin Time",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "feature_id",
+          "instrument_id",
+          "timeframe",
+          "detector",
+          "calc_version",
+          "origin_time",
+          "data_revision",
+          "event_time",
+          "event_tz",
+          "direction",
+          "provenance"
+        ],
+        "title": "TAEvent",
+        "type": "object"
+      },
+      "TAFeature": {
+        "additionalProperties": false,
+        "description": "Versioned feature object. ``origin_time`` is when the pattern formed; ``confirmation_time``\nis when it became knowable (e.g. a pivot at bar i confirms at i+3). ``as_of`` is the last\ncompleted bar the detector saw.",
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "as_of_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of Tz",
+            "type": "string"
+          },
+          "calc_version": {
+            "description": "Semantic version of the calculation that produced this object.",
+            "examples": [
+              "1.0.0"
+            ],
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Calc Version",
+            "type": "string"
+          },
+          "confirmation_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Null while the feature is still pending.",
+            "title": "Confirmation Time"
+          },
+          "confirmation_tz": {
+            "anyOf": [
+              {
+                "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+                "examples": [
+                  "America/Chicago",
+                  "America/New_York",
+                  "UTC"
+                ],
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Set exactly when ``confirmation_time`` is set.",
+            "title": "Confirmation Tz"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contract Code"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "description": "Detector-specific payload (histogram bins, displacement tag, fill depth ...).",
+            "title": "Details",
+            "type": "object"
+          },
+          "detector": {
+            "enum": [
+              "volume_profile",
+              "fvg",
+              "liquidity_sweep",
+              "bos",
+              "order_block",
+              "rsi_divergence",
+              "swing_pivot",
+              "liquidity_pool",
+              "atr",
+              "rsi",
+              "vwap",
+              "session_levels",
+              "correlation"
+            ],
+            "title": "Detector",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "bullish",
+              "bearish",
+              "neutral"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/Level"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "origin_time": {
+            "format": "date-time",
+            "title": "Origin Time",
+            "type": "string"
+          },
+          "origin_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Origin Tz",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "description": "Exact detector parameters used for this calculation.",
+            "title": "Parameters",
+            "type": "object"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "session": {
+            "enum": [
+              "current_session",
+              "prior_session",
+              "overnight",
+              "rth",
+              "eth",
+              "anchored",
+              "fixed_range",
+              "composite"
+            ],
+            "title": "Session",
+            "type": "string"
+          },
+          "session_calendar_id": {
+            "title": "Session Calendar Id",
+            "type": "string"
+          },
+          "session_calendar_version": {
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Session Calendar Version",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "format": "uuid",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "touched",
+              "midpoint_touched",
+              "partially_filled",
+              "filled",
+              "revisited",
+              "consumed",
+              "invalidated",
+              "expired"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "e.g. 'approximation: bar-derived volume', 'roll window excluded'.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "detector",
+          "calc_version",
+          "instrument_id",
+          "timeframe",
+          "session",
+          "session_calendar_id",
+          "session_calendar_version",
+          "direction",
+          "levels",
+          "state",
+          "origin_time",
+          "origin_tz",
+          "as_of",
+          "as_of_tz",
+          "snapshot_id",
+          "data_revision",
+          "provenance"
+        ],
+        "title": "TAFeature",
+        "type": "object"
+      },
+      "TAFeatureTransition": {
+        "additionalProperties": false,
+        "description": "Post-confirmation lifecycle (touch, fill, invalidation) for one data revision.\n\nNot part of the ``ta_events`` idempotency key. ``feature_id`` is the id the detector assigned\non the :class:`TAFeature`.",
+        "properties": {
+          "bar_time": {
+            "description": "Close time of the completed bar that caused this.",
+            "format": "date-time",
+            "title": "Bar Time",
+            "type": "string"
+          },
+          "bar_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Bar Tz",
+            "type": "string"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "feature_id": {
+            "format": "uuid",
+            "title": "Feature Id",
+            "type": "string"
+          },
+          "from_state": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "touched",
+              "midpoint_touched",
+              "partially_filled",
+              "filled",
+              "revisited",
+              "consumed",
+              "invalidated",
+              "expired"
+            ],
+            "title": "From State",
+            "type": "string"
+          },
+          "to_state": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "touched",
+              "midpoint_touched",
+              "partially_filled",
+              "filled",
+              "revisited",
+              "consumed",
+              "invalidated",
+              "expired"
+            ],
+            "title": "To State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature_id",
+          "from_state",
+          "to_state",
+          "bar_time",
+          "bar_tz",
+          "data_revision"
+        ],
+        "title": "TAFeatureTransition",
+        "type": "object"
+      },
+      "Thesis": {
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "asset_class": {
+            "enum": [
+              "futures",
+              "equity",
+              "etf",
+              "crypto_spot",
+              "crypto_futures",
+              "event_contract"
+            ],
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "catalysts": {
+            "items": {
+              "$ref": "#/components/schemas/Catalyst"
+            },
+            "title": "Catalysts",
+            "type": "array"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Actual futures contract when applicable.",
+            "title": "Contract Code"
+          },
+          "correlated_markets": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelatedMarket"
+            },
+            "title": "Correlated Markets",
+            "type": "array"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "horizon": {
+            "examples": [
+              "intraday",
+              "2-5 sessions",
+              "swing"
+            ],
+            "title": "Horizon",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "is_demonstration": {
+            "description": "True whenever provenance is not live; UI must label it prominently.",
+            "title": "Is Demonstration",
+            "type": "boolean"
+          },
+          "macro_context": {
+            "title": "Macro Context",
+            "type": "string"
+          },
+          "market_narrative": {
+            "title": "Market Narrative",
+            "type": "string"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Data",
+            "type": "array"
+          },
+          "opposing_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "title": "Opposing Evidence",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/TradePlan"
+          },
+          "presentation_markdown": {
+            "description": "Editable presentation of this thesis.",
+            "title": "Presentation Markdown",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 4000,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskCalculation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Run Id"
+          },
+          "stance": {
+            "enum": [
+              "bullish",
+              "bearish",
+              "neutral",
+              "insufficient_evidence"
+            ],
+            "title": "Stance",
+            "type": "string"
+          },
+          "supporting_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "title": "Supporting Evidence",
+            "type": "array"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "technical_findings": {
+            "items": {
+              "$ref": "#/components/schemas/FeatureReference"
+            },
+            "title": "Technical Findings",
+            "type": "array"
+          },
+          "uncertainty": {
+            "title": "Uncertainty",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/ValidationResult"
+          },
+          "venue": {
+            "title": "Venue",
+            "type": "string"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/ThesisVersions"
+          }
+        },
+        "required": [
+          "id",
+          "instrument_id",
+          "symbol",
+          "asset_class",
+          "venue",
+          "horizon",
+          "as_of",
+          "stance",
+          "plan",
+          "technical_findings",
+          "market_narrative",
+          "macro_context",
+          "uncertainty",
+          "rationale",
+          "versions",
+          "validation",
+          "presentation_markdown",
+          "provenance",
+          "is_demonstration"
+        ],
+        "title": "Thesis",
+        "type": "object"
+      },
+      "ThesisVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "harness_version": {
+            "title": "Harness Version",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Model name as configured server-side.",
+            "title": "Model"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "tool_versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Tool Versions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "provider",
+          "prompt_version",
+          "harness_version"
+        ],
+        "title": "ThesisVersions",
+        "type": "object"
+      },
+      "ToolCall": {
+        "additionalProperties": false,
+        "properties": {
+          "arguments": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Arguments",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "arguments"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
+      "ToolResult": {
+        "additionalProperties": false,
+        "properties": {
+          "call_id": {
+            "title": "Call Id",
+            "type": "string"
+          },
+          "is_error": {
+            "default": false,
+            "title": "Is Error",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "output": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "required": [
+          "call_id",
+          "name",
+          "output"
+        ],
+        "title": "ToolResult",
+        "type": "object"
+      },
+      "ToolSpec": {
+        "additionalProperties": false,
+        "description": "A typed function tool. ``parameters`` is a JSON Schema object; the server enforces limits.",
+        "properties": {
+          "counts_as_external_retrieval": {
+            "default": false,
+            "description": "True for web/search/source fetches subject to the 12-call cap.",
+            "title": "Counts As External Retrieval",
+            "type": "boolean"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "max_calls_per_run": {
+            "default": 12,
+            "minimum": 0,
+            "title": "Max Calls Per Run",
+            "type": "integer"
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_]{2,63}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "version": {
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "parameters",
+          "version"
+        ],
+        "title": "ToolSpec",
+        "type": "object"
+      },
+      "Trade": {
+        "additionalProperties": false,
+        "description": "A single trade print. ``side`` is the aggressor side only when the venue reports it;\nprice-up/price-down volume is never labeled as buy/sell.",
+        "properties": {
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contract Code"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "price": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Price",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "sequence": {
+            "description": "Monotonic sequence within the snapshot.",
+            "minimum": 0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "side": {
+            "default": "unknown",
+            "enum": [
+              "buy",
+              "sell",
+              "unknown"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Size",
+            "type": "string"
+          },
+          "trade_time": {
+            "format": "date-time",
+            "title": "Trade Time",
+            "type": "string"
+          },
+          "trade_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Trade Tz",
+            "type": "string"
+          },
+          "venue": {
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "sequence",
+          "trade_time",
+          "trade_tz",
+          "price",
+          "size",
+          "venue",
+          "data_revision",
+          "provenance"
+        ],
+        "title": "Trade",
+        "type": "object"
+      },
+      "TradeBatch": {
+        "additionalProperties": false,
+        "description": "Trade prints from one snapshot, ordered by ``sequence``.",
+        "properties": {
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Contract Code"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "fixture",
+              "recorded",
+              "live"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/Trade"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "data_revision",
+          "provenance",
+          "trades"
+        ],
+        "title": "TradeBatch",
+        "type": "object"
+      },
+      "TradePlan": {
+        "additionalProperties": false,
+        "description": "Conditional plan. Any unsupported element stays null with ``unset_reason`` explaining why.",
+        "properties": {
+          "entry": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Entry"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Invalidation"
+          },
+          "monitoring_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Monitoring Criteria",
+            "type": "array"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target"
+          },
+          "unset_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Required when entry, invalidation or target is null.",
+            "title": "Unset Reason"
+          }
+        },
+        "title": "TradePlan",
+        "type": "object"
+      },
+      "Usage": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_cost_usd": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Actual Cost Usd"
+          },
+          "input_tokens": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "output_tokens": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "reserved_cost_usd": {
+            "default": "0",
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Reserved Cost Usd",
+            "type": "string"
+          },
+          "retrieval_calls": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Retrieval Calls",
+            "type": "integer"
+          }
+        },
+        "title": "Usage",
+        "type": "object"
+      },
+      "ValidationCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "name": {
+            "examples": [
+              "schema",
+              "numeric_crosscheck",
+              "evidence_ids_exist"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "passed"
+        ],
+        "title": "ValidationCheck",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "ValidationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "repair_attempted": {
+            "default": false,
+            "title": "Repair Attempted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "passed",
+          "checks"
+        ],
+        "title": "ValidationResult",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Research-only API for the Trading Research Workspace. Serves shared contracts, fixture market data and (from Stage 1B) chat, runs and artifacts. There is no broker order-write capability.",
+    "title": "Trading Research Workspace API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/bars": {
+      "get": {
+        "operationId": "getBars",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "examples": [
+                "6EZ6",
+                "SPY"
+              ],
+              "maxLength": 16,
+              "minLength": 1,
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeframe",
+            "required": false,
+            "schema": {
+              "default": "5m",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Timeframe",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 50000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Bars",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/v1/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdapterCapabilities"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Capabilities",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/v1/futures-contracts": {
+      "get": {
+        "operationId": "listFuturesContracts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "root",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 8,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FuturesContract"
+                  },
+                  "title": "Response Listfuturescontracts",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Futures Contracts",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/v1/instruments": {
+      "get": {
+        "operationId": "listInstruments",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Instrument"
+                  },
+                  "title": "Response Listinstruments",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Instruments",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/v1/session-calendars": {
+      "get": {
+        "operationId": "listSessionCalendars",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionCalendar"
+                  },
+                  "title": "Response Listsessioncalendars",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Session Calendars",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/v1/snapshots": {
+      "get": {
+        "operationId": "listSnapshots",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarketSnapshot"
+                  },
+                  "title": "Response Listsnapshots",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Snapshots",
+        "tags": [
+          "market"
+        ]
+      }
+    }
+  }
+}

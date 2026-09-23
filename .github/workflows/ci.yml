@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Fixture path only: no provider credentials exist in CI.
+  TRW_MODE: fixture
+  LLM_PROVIDER: recorded
+  UV_LOCKED: "1"
+
+jobs:
+  python:
+    name: Python (ruff, mypy, pytest, fixtures, migrations)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Python and dependencies
+        run: uv sync --all-packages
+      - name: Ruff lint
+        run: uv run ruff check --output-format github
+      - name: Ruff format
+        run: uv run ruff format --check
+      - name: mypy (strict)
+        run: uv run mypy
+      - name: Generate fixtures
+        run: |
+          uv run trading-core fixtures generate
+          uv run trading-core fixtures verify
+      - name: Apply migrations to a fresh Postgres
+        run: uv run python scripts/apply_migrations.py --seed
+      - name: pytest (unit + smoke, including Postgres)
+        run: uv run pytest
+      - name: Worker starts and exits cleanly
+        run: uv run trading-worker --once
+
+  web:
+    name: Web (typecheck, lint, vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  contracts:
+    name: Contracts are current (Pydantic -> OpenAPI -> TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: uv sync --all-packages
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate and diff committed contracts
+        run: bash scripts/check_contracts.sh
