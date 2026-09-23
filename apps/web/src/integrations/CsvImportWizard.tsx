@@ -19,9 +19,56 @@ const FIELD_LABELS: Record<string, string> = {
   contract_code: "Contract code",
   venue: "Venue",
   fill_tz: "Timezone",
+  activity: "Activity",
+  cash_amount: "Cash amount",
 };
 
 const REQUIRED = new Set(["symbol", "side", "quantity", "price", "fill_time"]);
+
+type PreviewRow = ImportPreview["rows"][number];
+
+function csvHeader(line: string): string[] {
+  const headers: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i] ?? "";
+    if (quoted) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
+      headers.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  headers.push(current.trim());
+  return headers.filter((header) => header.length > 0);
+}
+
+function rowStatus(row: PreviewRow): string {
+  if (row.is_duplicate) {
+    return "Duplicate";
+  }
+  if (row.row_kind === "settlement") {
+    return "Settlement, excluded from P&L";
+  }
+  if (!row.is_complete) {
+    return "Incomplete";
+  }
+  return "OK";
+}
 
 type Props = {
   onClose: () => void;
@@ -45,7 +92,7 @@ export function CsvImportWizard({ onClose, onImported }: Props) {
     void file.text().then((text) => {
       setCsvText(text);
       const first = text.split(/\r?\n/).find((line) => line.trim().length > 0) ?? "";
-      const cols = first.split(",").map((c) => c.trim()).filter(Boolean);
+      const cols = csvHeader(first);
       setHeaders(cols);
       const columns: Record<string, string> = {};
       const guess = (field: string, hints: string[]) => {
@@ -59,6 +106,8 @@ export function CsvImportWizard({ onClose, onImported }: Props) {
       guess("fill_time", ["date", "fill time", "datetime", "time"]);
       guess("fees", ["fees", "commission", "fee"]);
       guess("contract_code", ["contract", "contract code", "expiry"]);
+      guess("activity", ["activity", "type", "transaction type", "trans type"]);
+      guess("cash_amount", ["cash", "cash amount", "settlement", "settlement amount"]);
       setMapping({
         columns,
         default_currency: "USD",
@@ -178,13 +227,17 @@ export function CsvImportWizard({ onClose, onImported }: Props) {
                   value={mapping.columns[field as keyof typeof mapping.columns] ?? ""}
                   onChange={(e) => {
                     const value = e.target.value;
-                    setMapping({
-                      ...mapping,
-                      columns: {
-                        ...mapping.columns,
-                        ...(value ? { [field]: value } : {}),
-                      },
-                    });
+                    const key = field as keyof CsvColumnMapping["columns"];
+                    const columns: CsvColumnMapping["columns"] = {};
+                    for (const [name, header] of Object.entries(mapping.columns)) {
+                      if (name !== field && header) {
+                        columns[name as keyof CsvColumnMapping["columns"]] = header;
+                      }
+                    }
+                    if (value) {
+                      columns[key] = value;
+                    }
+                    setMapping({ ...mapping, columns });
                     setPreview(null);
                   }}
                 >
@@ -222,10 +275,10 @@ export function CsvImportWizard({ onClose, onImported }: Props) {
         <button
           type="button"
           className="primary"
-          disabled={!preview || preview.trusted_row_count === 0 || busy}
+          disabled={!preview || preview.importable_count === 0 || busy}
           onClick={() => { void runCommit(); }}
         >
-          Import trusted rows
+          Import rows
         </button>
       </div>
 
@@ -237,6 +290,7 @@ export function CsvImportWizard({ onClose, onImported }: Props) {
             <div><dt>Trusted</dt><dd className="num">{preview.trusted_row_count}</dd></div>
             <div><dt>Incomplete</dt><dd className="num">{preview.incomplete_count}</dd></div>
             <div><dt>Duplicates</dt><dd className="num">{preview.duplicate_count}</dd></div>
+            <div><dt>Settlement</dt><dd className="num">{preview.settlement_count}</dd></div>
           </dl>
           <table>
             <thead>
@@ -257,11 +311,7 @@ export function CsvImportWizard({ onClose, onImported }: Props) {
                   <td>{row.side ?? "—"}</td>
                   <td className="num">{row.quantity ?? "—"}</td>
                   <td className="num">{row.price ?? "—"}</td>
-                  <td>
-                    {row.is_duplicate ? "Duplicate" : null}
-                    {!row.is_complete ? "Incomplete" : null}
-                    {row.is_complete && !row.is_duplicate ? "OK" : null}
-                  </td>
+                  <td>{rowStatus(row)}</td>
                 </tr>
               ))}
             </tbody>

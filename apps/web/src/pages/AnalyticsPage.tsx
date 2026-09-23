@@ -9,13 +9,11 @@ type Panel = "trading" | "outcomes" | "agent";
 
 const FAMILIES = [
   { id: "", label: "All families" },
-  { id: "fx_futures", label: "FX futures" },
-  { id: "metals_futures", label: "Metals futures" },
-  { id: "commodity_futures", label: "Commodity futures" },
-  { id: "index_futures", label: "Index futures" },
+  { id: "futures", label: "Futures" },
   { id: "equity", label: "Equities" },
   { id: "etf", label: "ETFs" },
   { id: "crypto_spot", label: "Spot crypto" },
+  { id: "crypto_futures", label: "Crypto futures" },
 ];
 
 export function AnalyticsPage() {
@@ -59,15 +57,17 @@ function Tab({
 
 function MyTrading() {
   const [family, setFamily] = useState("");
+  const [symbol, setSymbol] = useState("");
   const assetClass = family.length > 0 ? family : null;
-  const fills = useImportedFills(assetClass);
-  const summary = useTradingSummary(assetClass);
+  const symbolQuery = symbol.trim().length > 0 ? symbol.trim() : null;
+  const fills = useImportedFills(assetClass, symbolQuery);
+  const summary = useTradingSummary(assetClass, symbolQuery);
 
   return (
     <section aria-labelledby="my-trading">
       <h3 id="my-trading">My Trading</h3>
       <p className="hint">
-        Reconciled realized P&amp;L and fees from imported fills. Incomplete rows are excluded from trusted totals. Portfolio return is not shown without balances and cash flows.
+        Reconciled realized P&amp;L and fees from imported fills. Futures P&amp;L uses the contract multiplier. Incomplete rows stay visible and are excluded from trusted totals. Settlement cash is not added on top of FIFO. Portfolio return is not shown without balances and cash flows.
       </p>
 
       <div className="field-row">
@@ -83,6 +83,15 @@ function MyTrading() {
             <option key={f.id || "all"} value={f.id}>{f.label}</option>
           ))}
         </select>
+        <label htmlFor="symbol-filter">Symbol</label>
+        <input
+          id="symbol-filter"
+          value={symbol}
+          onChange={(e) => {
+            setSymbol(e.target.value);
+          }}
+          placeholder="6E, 6EZ6, SPY"
+        />
       </div>
 
       {summary.data ? (
@@ -109,11 +118,51 @@ function MyTrading() {
               <dd className="num">{summary.data.incomplete_fill_count}</dd>
             </div>
           ) : null}
+          {summary.data.settlement_flow_count > 0 ? (
+            <div>
+              <dt>Settlement cash excluded</dt>
+              <dd className="num">{formatDecimal(summary.data.settlement_cash_excluded)}</dd>
+            </div>
+          ) : null}
         </dl>
+      ) : null}
+
+      {summary.data && summary.data.summary_currency === null && summary.data.trusted_fill_count > 0 ? (
+        <p className="hint">
+          Headline totals are withheld because these fills are not all in one currency. Per-contract lines stay below.
+        </p>
       ) : null}
 
       {summary.data && !summary.data.portfolio_return_available ? (
         <p className="hint">Portfolio return unavailable — import account snapshots with cash flows to enable that view later.</p>
+      ) : null}
+
+      {summary.data && summary.data.lines.length > 0 ? (
+        <table>
+          <thead>
+            <tr>
+              <th>Contract</th>
+              <th>Realized</th>
+              <th>Fees</th>
+              <th>Net</th>
+              <th>Fills</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.data.lines.map((line) => (
+              <tr key={`${line.symbol}-${line.contract_code ?? ""}-${line.currency}`}>
+                <td>
+                  {line.symbol}
+                  {line.contract_code ? ` ${line.contract_code}` : ""}
+                </td>
+                <td className="num">{formatDecimal(line.realized_pnl)}</td>
+                <td className="num">{formatDecimal(line.fees)}</td>
+                <td className="num">{formatDecimal(line.net_pnl)}</td>
+                <td className="num">{line.fill_count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : null}
 
       <table>

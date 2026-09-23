@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from trading_api.auth import UserDep
+from trading_api.dependencies import get_app_settings
 from trading_core.domain.trading_records import KalshiEventBrief, KalshiMarket
 from trading_core.kalshi.service import KalshiService
 
@@ -14,9 +15,8 @@ router = APIRouter(prefix="/v1/kalshi", tags=["kalshi"])
 
 
 def _kalshi(request: Request) -> KalshiService:
-    settings = request.app.state.settings
-    use_live = getattr(settings, "mode", "fixture") == "live"
-    return KalshiService(use_live=use_live)
+    settings = get_app_settings(request)
+    return KalshiService(use_live=settings.mode == "live")
 
 
 @router.get("/markets", response_model=list[KalshiMarket], operation_id="listKalshiMarkets")

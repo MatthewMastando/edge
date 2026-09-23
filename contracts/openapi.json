@@ -716,7 +716,9 @@
                 "currency",
                 "contract_code",
                 "venue",
-                "fill_tz"
+                "fill_tz",
+                "activity",
+                "cash_amount"
               ]
             },
             "title": "Columns",
@@ -1356,6 +1358,16 @@
             "title": "Imported Count",
             "type": "integer"
           },
+          "incomplete_stored": {
+            "default": 0,
+            "title": "Incomplete Stored",
+            "type": "integer"
+          },
+          "settlement_stored": {
+            "default": 0,
+            "title": "Settlement Stored",
+            "type": "integer"
+          },
           "skipped_incomplete": {
             "title": "Skipped Incomplete",
             "type": "integer"
@@ -1409,6 +1421,11 @@
             "title": "Filename",
             "type": "string"
           },
+          "importable_count": {
+            "default": 0,
+            "title": "Importable Count",
+            "type": "integer"
+          },
           "incomplete_count": {
             "title": "Incomplete Count",
             "type": "integer"
@@ -1427,8 +1444,13 @@
             "title": "Rows",
             "type": "array"
           },
+          "settlement_count": {
+            "default": 0,
+            "title": "Settlement Count",
+            "type": "integer"
+          },
           "trusted_row_count": {
-            "description": "Rows that would be imported and count toward trusted P&L totals.",
+            "description": "Complete fills that would be imported and count toward trusted P&L totals. Settlement cash and incomplete rows are not included.",
             "title": "Trusted Row Count",
             "type": "integer"
           }
@@ -1485,6 +1507,19 @@
               }
             ],
             "title": "Asset Class"
+          },
+          "cash_amount": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Amount"
           },
           "contract_code": {
             "anyOf": [
@@ -1624,6 +1659,15 @@
             ],
             "title": "Quantity"
           },
+          "row_kind": {
+            "default": "fill",
+            "enum": [
+              "fill",
+              "settlement"
+            ],
+            "title": "Row Kind",
+            "type": "string"
+          },
           "side": {
             "anyOf": [
               {
@@ -1662,6 +1706,11 @@
               }
             ],
             "title": "Venue"
+          },
+          "will_import": {
+            "default": false,
+            "title": "Will Import",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1692,7 +1741,9 @@
                   "currency",
                   "contract_code",
                   "venue",
-                  "fill_tz"
+                  "fill_tz",
+                  "activity",
+                  "cash_amount"
                 ],
                 "type": "string"
               },
@@ -4891,8 +4942,33 @@
           },
           "portfolio_return_available": {
             "default": false,
+            "description": "True only when account balances and external cash flows both exist. Fill P&L alone is not a portfolio return.",
             "title": "Portfolio Return Available",
             "type": "boolean"
+          },
+          "settlement_cash_excluded": {
+            "default": "0",
+            "description": "Signed settlement cash stored for this view and left out of FIFO realized P&L so variation margin is not double-counted against closing fills.",
+            "format": "decimal",
+            "title": "Settlement Cash Excluded",
+            "type": "string"
+          },
+          "settlement_flow_count": {
+            "default": 0,
+            "title": "Settlement Flow Count",
+            "type": "integer"
+          },
+          "summary_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Currency of the headline totals. Null when there are no trusted fills or when fills span more than one currency. Mixed-currency headline totals are withheld.",
+            "title": "Summary Currency"
           },
           "total_fees": {
             "description": "Exact decimal encoded as a string (money, prices, sizes).",
@@ -6427,6 +6503,23 @@
           },
           {
             "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
             "name": "trusted_only",
             "required": false,
             "schema": {
@@ -6516,6 +6609,23 @@
                 }
               ],
               "title": "Instrument Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
             }
           }
         ],

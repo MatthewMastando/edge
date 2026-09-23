@@ -21,6 +21,7 @@ async def list_fills(
     user: UserDep,
     asset_class: Annotated[str | None, Query(max_length=32)] = None,
     instrument_id: Annotated[UUID | None, Query()] = None,
+    symbol: Annotated[str | None, Query(max_length=32)] = None,
     trusted_only: Annotated[bool, Query()] = False,
     limit: Annotated[int, Query(ge=1, le=2000)] = 500,
 ) -> list[ImportedFillView]:
@@ -30,6 +31,7 @@ async def list_fills(
             user.id,
             asset_class=asset_class,
             instrument_id=instrument_id,
+            symbol=symbol,
             trusted_only=trusted_only,
             limit=limit,
         )
@@ -41,6 +43,7 @@ async def get_summary(
     user: UserDep,
     asset_class: Annotated[str | None, Query(max_length=32)] = None,
     instrument_id: Annotated[UUID | None, Query()] = None,
+    symbol: Annotated[str | None, Query(max_length=32)] = None,
 ) -> TradingSummary:
     async with database.engine.begin() as conn:
         return await trading_summary_for_owner(
@@ -48,4 +51,5 @@ async def get_summary(
             user.id,
             asset_class=asset_class,
             instrument_id=instrument_id,
+            symbol=symbol,
         )

@@ -52,26 +52,34 @@ export function useImportPresets() {
   });
 }
 
-export function useImportedFills(assetClass: string | null) {
+export function useImportedFills(assetClass: string | null, symbol: string | null) {
   return useQuery({
-    queryKey: ["trading-fills", assetClass],
+    queryKey: ["trading-fills", assetClass, symbol],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/trading/fills", {
-          params: { query: { asset_class: assetClass ?? undefined, limit: 500 } },
+          params: {
+            query: {
+              asset_class: assetClass ?? undefined,
+              symbol: symbol ?? undefined,
+              limit: 500,
+            },
+          },
         }),
         "Imported fills",
       ),
   });
 }
 
-export function useTradingSummary(assetClass: string | null) {
+export function useTradingSummary(assetClass: string | null, symbol: string | null) {
   return useQuery({
-    queryKey: ["trading-summary", assetClass],
+    queryKey: ["trading-summary", assetClass, symbol],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/trading/summary", {
-          params: { query: { asset_class: assetClass ?? undefined } },
+          params: {
+            query: { asset_class: assetClass ?? undefined, symbol: symbol ?? undefined },
+          },
         }),
         "Trading summary",
       ),

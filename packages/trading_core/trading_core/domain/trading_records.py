@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -20,6 +21,8 @@ ImportField = Literal[
     "contract_code",
     "venue",
     "fill_tz",
+    "activity",
+    "cash_amount",
 ]
 
 IMPORT_FIELDS: tuple[ImportField, ...] = (
@@ -33,6 +36,8 @@ IMPORT_FIELDS: tuple[ImportField, ...] = (
     "contract_code",
     "venue",
     "fill_tz",
+    "activity",
+    "cash_amount",
 )
 
 
@@ -75,8 +80,11 @@ class ImportPreviewRow(DomainModel):
     instrument_symbol: str | None = None
     asset_class: str | None = None
     multiplier: DecimalStr | None = None
+    row_kind: Literal["fill", "settlement"] = "fill"
+    cash_amount: DecimalStr | None = None
     is_complete: bool = False
     is_duplicate: bool = False
+    will_import: bool = False
     issues: tuple[ImportRowIssue, ...] = ()
 
 
@@ -89,8 +97,13 @@ class ImportPreview(DomainModel):
     incomplete_count: int
     duplicate_count: int
     error_count: int
+    settlement_count: int = 0
+    importable_count: int = 0
     trusted_row_count: int = Field(
-        description="Rows that would be imported and count toward trusted P&L totals."
+        description=(
+            "Complete fills that would be imported and count toward trusted P&L totals. "
+            "Settlement cash and incomplete rows are not included."
+        )
     )
 
 
@@ -99,6 +112,8 @@ class ImportCommitResult(DomainModel):
     imported_count: int
     duplicate_count: int
     skipped_incomplete: int
+    incomplete_stored: int = 0
+    settlement_stored: int = 0
     error_count: int
 
 
@@ -149,7 +164,28 @@ class TradingSummary(DomainModel):
     trusted_fill_count: int
     incomplete_fill_count: int
     has_account_snapshots: bool = False
-    portfolio_return_available: bool = False
+    portfolio_return_available: bool = Field(
+        default=False,
+        description=(
+            "True only when account balances and external cash flows both exist. "
+            "Fill P&L alone is not a portfolio return."
+        ),
+    )
+    summary_currency: str | None = Field(
+        default=None,
+        description=(
+            "Currency of the headline totals. Null when there are no trusted fills or when "
+            "fills span more than one currency. Mixed-currency headline totals are withheld."
+        ),
+    )
+    settlement_flow_count: int = 0
+    settlement_cash_excluded: DecimalStr = Field(
+        default=Decimal(0),
+        description=(
+            "Signed settlement cash stored for this view and left out of FIFO realized P&L "
+            "so variation margin is not double-counted against closing fills."
+        ),
+    )
 
 
 class KalshiMarket(DomainModel):

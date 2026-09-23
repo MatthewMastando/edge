@@ -1094,6 +1094,16 @@ export type components = {
             error_count: number;
             /** Imported Count */
             imported_count: number;
+            /**
+             * Incomplete Stored
+             * @default 0
+             */
+            incomplete_stored: number;
+            /**
+             * Settlement Stored
+             * @default 0
+             */
+            settlement_stored: number;
             /** Skipped Incomplete */
             skipped_incomplete: number;
         };
@@ -1184,6 +1194,11 @@ export type components = {
             error_count: number;
             /** Filename */
             filename: string;
+            /**
+             * Importable Count
+             * @default 0
+             */
+            importable_count: number;
             /** Incomplete Count */
             incomplete_count: number;
             mapping: components["schemas"]["CsvColumnMapping"];
@@ -1192,8 +1207,13 @@ export type components = {
             /** Rows */
             rows: components["schemas"]["ImportPreviewRow"][];
             /**
+             * Settlement Count
+             * @default 0
+             */
+            settlement_count: number;
+            /**
              * Trusted Row Count
-             * @description Rows that would be imported and count toward trusted P&L totals.
+             * @description Complete fills that would be imported and count toward trusted P&L totals. Settlement cash and incomplete rows are not included.
              */
             trusted_row_count: number;
         };
@@ -1209,6 +1229,8 @@ export type components = {
         ImportPreviewRow: {
             /** Asset Class */
             asset_class?: string | null;
+            /** Cash Amount */
+            cash_amount?: string | null;
             /** Contract Code */
             contract_code?: string | null;
             /** Currency */
@@ -1244,6 +1266,12 @@ export type components = {
             price?: string | null;
             /** Quantity */
             quantity?: string | null;
+            /**
+             * Row Kind
+             * @default fill
+             * @enum {string}
+             */
+            row_kind: "fill" | "settlement";
             /** Side */
             side?: ("buy" | "sell") | null;
             /** Source Row Hash */
@@ -1254,13 +1282,18 @@ export type components = {
             symbol_raw: string;
             /** Venue */
             venue?: string | null;
+            /**
+             * Will Import
+             * @default false
+             */
+            will_import: boolean;
         };
         /** ImportRowIssue */
         ImportRowIssue: {
             /** Code */
             code: string;
             /** Field */
-            field?: ("symbol" | "side" | "quantity" | "price" | "fees" | "fill_time" | "currency" | "contract_code" | "venue" | "fill_tz") | null;
+            field?: ("symbol" | "side" | "quantity" | "price" | "fees" | "fill_time" | "currency" | "contract_code" | "venue" | "fill_tz" | "activity" | "cash_amount") | null;
             /** Message */
             message: string;
             /**
@@ -2689,9 +2722,27 @@ export type components = {
             lines: components["schemas"]["RealizedPnLLine"][];
             /**
              * Portfolio Return Available
+             * @description True only when account balances and external cash flows both exist. Fill P&L alone is not a portfolio return.
              * @default false
              */
             portfolio_return_available: boolean;
+            /**
+             * Settlement Cash Excluded
+             * Format: decimal
+             * @description Signed settlement cash stored for this view and left out of FIFO realized P&L so variation margin is not double-counted against closing fills.
+             * @default 0
+             */
+            settlement_cash_excluded: string;
+            /**
+             * Settlement Flow Count
+             * @default 0
+             */
+            settlement_flow_count: number;
+            /**
+             * Summary Currency
+             * @description Currency of the headline totals. Null when there are no trusted fills or when fills span more than one currency. Mixed-currency headline totals are withheld.
+             */
+            summary_currency?: string | null;
             /**
              * Total Fees
              * Format: decimal
@@ -3596,6 +3647,7 @@ export interface operations {
                 asset_class?: string | null;
                 instrument_id?: string | null;
                 limit?: number;
+                symbol?: string | null;
                 trusted_only?: boolean;
             };
             header?: never;
@@ -3629,6 +3681,7 @@ export interface operations {
             query?: {
                 asset_class?: string | null;
                 instrument_id?: string | null;
+                symbol?: string | null;
             };
             header?: never;
             path?: never;

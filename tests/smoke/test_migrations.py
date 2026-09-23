@@ -51,6 +51,7 @@ EXPECTED_TABLES = {
     "hypothesis_observations",
     "import_batches",
     "imported_fills",
+    "imported_cash_flows",
     "account_snapshots",
     "usage_ledger",
     "budgets",

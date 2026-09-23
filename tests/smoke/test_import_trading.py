@@ -52,7 +52,7 @@ def import_db(database_url: str) -> Iterator[str]:
 
 
 @pytest.fixture
-def api_client(import_db: str, generated_dir: Path) -> TestClient:
+def api_client(import_db: str, generated_dir: Path) -> Iterator[TestClient]:
     settings = ApiSettings(
         database_url=import_db,
         mode="fixture",
@@ -60,7 +60,8 @@ def api_client(import_db: str, generated_dir: Path) -> TestClient:
         cors_origins="http://localhost:5173",
         supabase_jwt_secret="",
     )
-    return TestClient(create_app(settings))
+    with TestClient(create_app(settings)) as client:
+        yield client
 
 
 @pytest.fixture
@@ -123,13 +124,33 @@ def test_import_preview_commit_and_reimport(
 
     fills = api_client.get("/v1/trading/fills")
     assert fills.status_code == 200
-    assert len(fills.json()) >= 2
+    fill_rows = fills.json()
+    assert len(fill_rows) >= 3
+    assert any(row["is_complete"] is False for row in fill_rows)
 
     summary = api_client.get("/v1/trading/summary")
     assert summary.status_code == 200
     summary_body = summary.json()
     assert summary_body["portfolio_return_available"] is False
-    assert summary_body["trusted_fill_count"] >= 2
+    assert summary_body["trusted_fill_count"] == 3
+    assert summary_body["incomplete_fill_count"] == 1
+    # (1.0865 - 1.0850) * 125000 on 6EZ6. SPY is still open. Fees are not multiplied.
+    assert (
+        summary_body["total_realized_pnl"] == "187.5000"
+        or summary_body["total_realized_pnl"] == "187.5"
+    )
+    assert summary_body["total_fees"] in {"2.50", "2.5000", "2.5"}
+
+    futures = api_client.get("/v1/trading/fills", params={"asset_class": "futures"})
+    assert futures.status_code == 200
+    assert {row["symbol_raw"] for row in futures.json()} == {"6E"}
+    etf = api_client.get("/v1/trading/summary", params={"asset_class": "etf"})
+    assert etf.status_code == 200
+    assert etf.json()["trusted_fill_count"] == 1
+    assert etf.json()["total_realized_pnl"] in {"0", "0.0", "0.00", "0.0000"}
+    missing_family = api_client.get("/v1/trading/summary", params={"asset_class": "fx_futures"})
+    assert missing_family.status_code == 200
+    assert missing_family.json()["trusted_fill_count"] == 0
 
 
 def test_kalshi_fixture_brief(api_client: TestClient) -> None:

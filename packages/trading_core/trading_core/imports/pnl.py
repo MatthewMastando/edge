@@ -123,108 +123,212 @@ async def list_fills_for_owner(
     *,
     asset_class: str | None = None,
     instrument_id: UUID | None = None,
+    symbol: str | None = None,
     trusted_only: bool = False,
-    limit: int = 500,
+    limit: int | None = 500,
 ) -> list[ImportedFillView]:
-    rows = await fetch_all(
-        conn,
-        """
+    sql = """
         select f.*, i.symbol as instrument_symbol, i.asset_class
         from imported_fills f
         join import_batches b on b.id = f.batch_id
         left join instruments i on i.id = f.instrument_id
         where b.owner_id = :owner_id
-          and (:asset_class is null or i.asset_class = :asset_class)
-          and (:instrument_id is null or f.instrument_id = :instrument_id)
+          and (cast(:asset_class as text) is null or i.asset_class = cast(:asset_class as text))
+          and (
+            cast(:instrument_id as uuid) is null
+            or f.instrument_id = cast(:instrument_id as uuid)
+          )
+          and (
+            cast(:symbol as text) is null
+            or upper(i.symbol) = upper(cast(:symbol as text))
+            or upper(f.symbol_raw) = upper(cast(:symbol as text))
+            or upper(coalesce(f.contract_code, '')) = upper(cast(:symbol as text))
+          )
           and (not :trusted_only or f.is_complete = true)
         order by f.fill_time desc
-        limit :limit
+    """
+    params: dict[str, object] = {
+        "owner_id": owner_id,
+        "asset_class": asset_class,
+        "instrument_id": instrument_id,
+        "symbol": symbol,
+        "trusted_only": trusted_only,
+    }
+    if limit is not None:
+        sql += "\nlimit :limit"
+        params["limit"] = limit
+    rows = await fetch_all(conn, sql, params)
+    return [_fill_view(row) for row in rows]
+
+
+@dataclass(frozen=True)
+class SettlementCash:
+    instrument_id: UUID | None
+    symbol: str
+    contract_code: str | None
+    currency: str
+    amount: Decimal
+
+
+async def list_settlement_cash_for_owner(
+    conn: AsyncConnection,
+    owner_id: UUID,
+    *,
+    asset_class: str | None = None,
+    instrument_id: UUID | None = None,
+    symbol: str | None = None,
+) -> list[SettlementCash]:
+    rows = await fetch_all(
+        conn,
+        """
+        select c.instrument_id, c.symbol_raw, c.contract_code, c.currency, c.amount,
+               i.symbol as instrument_symbol
+        from imported_cash_flows c
+        join import_batches b on b.id = c.batch_id
+        left join instruments i on i.id = c.instrument_id
+        where b.owner_id = :owner_id
+          and c.flow_kind = 'settlement'
+          and (cast(:asset_class as text) is null or i.asset_class = cast(:asset_class as text))
+          and (
+            cast(:instrument_id as uuid) is null
+            or c.instrument_id = cast(:instrument_id as uuid)
+          )
+          and (
+            cast(:symbol as text) is null
+            or upper(coalesce(i.symbol, c.symbol_raw)) = upper(cast(:symbol as text))
+            or upper(c.symbol_raw) = upper(cast(:symbol as text))
+            or upper(coalesce(c.contract_code, '')) = upper(cast(:symbol as text))
+          )
         """,
         {
             "owner_id": owner_id,
             "asset_class": asset_class,
             "instrument_id": instrument_id,
-            "trusted_only": trusted_only,
-            "limit": limit,
+            "symbol": symbol,
         },
     )
-    return [_fill_view(row) for row in rows]
+    return [
+        SettlementCash(
+            instrument_id=as_uuid(row["instrument_id"]) if row.get("instrument_id") else None,
+            symbol=as_str(row["instrument_symbol"])
+            if row.get("instrument_symbol")
+            else as_str(row["symbol_raw"]),
+            contract_code=as_str(row["contract_code"]) if row.get("contract_code") else None,
+            currency=as_str(row["currency"]),
+            amount=as_decimal(row["amount"]),
+        )
+        for row in rows
+    ]
 
 
 @dataclass
 class _Lot:
     quantity: Decimal
     price: Decimal
-    fees: Decimal
+    multiplier: Decimal
 
 
 def _multiplier_for(fill: ImportedFillView) -> Decimal:
-    if fill.multiplier is not None:
+    if fill.multiplier is not None and fill.multiplier > 0:
         return fill.multiplier
     return Decimal(1)
 
 
+def _position_key(
+    *,
+    instrument_id: UUID | None,
+    symbol: str,
+    contract_code: str | None,
+    currency: str,
+) -> tuple[str, str, str]:
+    identity = str(instrument_id) if instrument_id is not None else symbol.upper()
+    return (identity, (contract_code or "").upper(), currency.upper())
+
+
 def _realized_for_group(fills: list[ImportedFillView]) -> tuple[Decimal, Decimal]:
-    """FIFO realized P&L and fees for one instrument group."""
-    ordered = sorted(fills, key=lambda f: f.fill_time)
+    """FIFO realized P&L and currency fees for one contract.
+
+    Price differences use the opening lot's contract multiplier. Fees are already
+    currency amounts and are not multiplied again. Settlement cash is not an input
+    here; callers keep it out of this total.
+    """
+    ordered = sorted(fills, key=lambda fill: (fill.fill_time, fill.source_row_number))
     long_lots: list[_Lot] = []
     short_lots: list[_Lot] = []
     realized = Decimal(0)
     fees_total = Decimal(0)
-    mult = _multiplier_for(ordered[0]) if ordered else Decimal(1)
 
     for fill in ordered:
         qty = fill.quantity
         price = fill.price
-        fees = fill.fees
-        fees_total += fees
-        mult = _multiplier_for(fill)
+        fees_total += fill.fees
+        multiplier = _multiplier_for(fill)
 
         if fill.side == "buy":
             remaining = qty
             while remaining > 0 and short_lots:
                 lot = short_lots[0]
                 matched = min(remaining, lot.quantity)
-                realized += (lot.price - price) * matched * mult
+                realized += (lot.price - price) * matched * lot.multiplier
                 lot.quantity -= matched
                 remaining -= matched
                 if lot.quantity <= 0:
                     short_lots.pop(0)
             if remaining > 0:
-                long_lots.append(_Lot(quantity=remaining, price=price, fees=fees))
+                long_lots.append(_Lot(quantity=remaining, price=price, multiplier=multiplier))
         else:
             remaining = qty
             while remaining > 0 and long_lots:
                 lot = long_lots[0]
                 matched = min(remaining, lot.quantity)
-                realized += (price - lot.price) * matched * mult
+                realized += (price - lot.price) * matched * lot.multiplier
                 lot.quantity -= matched
                 remaining -= matched
                 if lot.quantity <= 0:
                     long_lots.pop(0)
             if remaining > 0:
-                short_lots.append(_Lot(quantity=remaining, price=price, fees=fees))
+                short_lots.append(_Lot(quantity=remaining, price=price, multiplier=multiplier))
 
     return realized, fees_total
+
+
+def _excluded_settlement_total(
+    cash_rows: list[SettlementCash], summary_currency: str | None
+) -> Decimal:
+    """Sum settlement cash that was kept out of FIFO. Do not blend currencies."""
+    if not cash_rows:
+        return Decimal(0)
+    currencies = {row.currency.upper() for row in cash_rows}
+    if len(currencies) != 1:
+        return Decimal(0)
+    only = next(iter(currencies))
+    if summary_currency is not None and only != summary_currency:
+        return Decimal(0)
+    return sum((row.amount for row in cash_rows), Decimal(0))
 
 
 def compute_trading_summary(
     fills: list[ImportedFillView],
     *,
     has_account_snapshots: bool,
+    settlements: list[SettlementCash] | None = None,
+    has_external_cash_flows: bool = False,
 ) -> TradingSummary:
-    trusted = [f for f in fills if f.is_complete]
-    incomplete_count = sum(1 for f in fills if not f.is_complete)
+    trusted = [fill for fill in fills if fill.is_complete]
+    incomplete_count = sum(1 for fill in fills if not fill.is_complete)
+    cash_rows = settlements or []
 
-    groups: dict[str, list[ImportedFillView]] = {}
+    groups: dict[tuple[str, str, str], list[ImportedFillView]] = {}
     for fill in trusted:
-        key = str(fill.instrument_id or fill.symbol_raw.upper())
+        key = _position_key(
+            instrument_id=fill.instrument_id,
+            symbol=fill.instrument_symbol or fill.symbol_raw,
+            contract_code=fill.contract_code,
+            currency=fill.currency,
+        )
         groups.setdefault(key, []).append(fill)
 
     lines: list[RealizedPnLLine] = []
-    total_realized = Decimal(0)
-    total_fees = Decimal(0)
-
     for group_fills in groups.values():
         realized, fees = _realized_for_group(group_fills)
         sample = group_fills[0]
@@ -241,21 +345,38 @@ def compute_trading_summary(
                 fill_count=len(group_fills),
             )
         )
-        total_realized += realized
-        total_fees += fees
 
-    lines.sort(key=lambda line: line.symbol)
-    total_net = total_realized - total_fees
+    lines.sort(key=lambda line: (line.symbol, line.contract_code or "", line.currency))
+    currencies = {line.currency.upper() for line in lines}
+    single_currency = len(currencies) == 1
+    if single_currency:
+        total_realized = sum((line.realized_pnl for line in lines), Decimal(0))
+        total_fees = sum((line.fees for line in lines), Decimal(0))
+        summary_currency: str | None = next(iter(currencies))
+    elif trusted:
+        # A blended number across currencies would be a fabricated total.
+        total_realized = Decimal(0)
+        total_fees = Decimal(0)
+        summary_currency = None
+    else:
+        total_realized = Decimal(0)
+        total_fees = Decimal(0)
+        summary_currency = None
+
+    settlement_excluded = _excluded_settlement_total(cash_rows, summary_currency)
 
     return TradingSummary(
         lines=tuple(lines),
         total_realized_pnl=total_realized,
         total_fees=total_fees,
-        total_net_pnl=total_net,
+        total_net_pnl=total_realized - total_fees,
         trusted_fill_count=len(trusted),
         incomplete_fill_count=incomplete_count,
         has_account_snapshots=has_account_snapshots,
-        portfolio_return_available=False,
+        portfolio_return_available=has_account_snapshots and has_external_cash_flows,
+        summary_currency=summary_currency,
+        settlement_flow_count=len(cash_rows),
+        settlement_cash_excluded=settlement_excluded,
     )
 
 
@@ -265,14 +386,23 @@ async def trading_summary_for_owner(
     *,
     asset_class: str | None = None,
     instrument_id: UUID | None = None,
+    symbol: str | None = None,
 ) -> TradingSummary:
     fills = await list_fills_for_owner(
         conn,
         owner_id,
         asset_class=asset_class,
         instrument_id=instrument_id,
+        symbol=symbol,
         trusted_only=False,
-        limit=5000,
+        limit=None,
+    )
+    settlements = await list_settlement_cash_for_owner(
+        conn,
+        owner_id,
+        asset_class=asset_class,
+        instrument_id=instrument_id,
+        symbol=symbol,
     )
     snapshot_row = await fetch_all(
         conn,
@@ -280,4 +410,9 @@ async def trading_summary_for_owner(
         {"owner_id": owner_id},
     )
     has_snapshots = len(snapshot_row) > 0
-    return compute_trading_summary(fills, has_account_snapshots=has_snapshots)
+    return compute_trading_summary(
+        fills,
+        has_account_snapshots=has_snapshots,
+        settlements=settlements,
+        has_external_cash_flows=False,
+    )
