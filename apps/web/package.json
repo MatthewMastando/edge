@@ -13,7 +13,19 @@
     "test:watch": "vitest",
     "generate:types": "openapi-typescript ../../contracts/openapi.json -o src/api/schema.d.ts --alphabetize --export-type"
   },
+  "msw": {
+    "workerDirectory": ["public"]
+  },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
+    "@tanstack/react-query": "^5.103.2",
+    "@tanstack/react-router": "^1.170.39",
+    "@tiptap/extension-placeholder": "^3.31.3",
+    "@tiptap/markdown": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "lightweight-charts": "^5.2.1",
     "openapi-fetch": "^0.17.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -22,6 +34,7 @@
     "@eslint/js": "^9.39.0",
     "@testing-library/jest-dom": "^6.9.0",
     "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -31,6 +44,7 @@
     "eslint-plugin-react-refresh": "^0.5.0",
     "globals": "^17.0.0",
     "jsdom": "^30.0.0",
+    "msw": "^2.15.0",
     "openapi-typescript": "^7.13.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.70.0",
