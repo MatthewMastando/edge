@@ -86,6 +86,7 @@ class FuturesContractSpec(_SpecModel):
     contract_month: str
     expiry_date: date
     last_trade_date: date
+    last_trade_time_local: time | None = None
     first_notice_date: date | None = None
     tick_size: DecimalStr
     tick_value: DecimalStr
@@ -105,6 +106,7 @@ class FuturesContractSpec(_SpecModel):
             contract_month=self.contract_month,
             expiry_date=self.expiry_date,
             last_trade_date=self.last_trade_date,
+            last_trade_time_local=self.last_trade_time_local,
             first_notice_date=self.first_notice_date,
             tick_size=self.tick_size,
             tick_value=self.tick_value,

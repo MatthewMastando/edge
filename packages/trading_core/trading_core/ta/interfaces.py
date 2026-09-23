@@ -10,7 +10,7 @@ from pydantic import Field, JsonValue
 from trading_core.domain.common import CalcVersion, DomainModel, SessionScope
 from trading_core.domain.instruments import FuturesContract, Instrument, SessionCalendar
 from trading_core.domain.market import BarSeries, TradeBatch
-from trading_core.domain.ta import DetectorName, TAEvent, TAFeature
+from trading_core.domain.ta import DetectorName, TAEvent, TAFeature, TAFeatureTransition
 
 
 class InsufficientDataError(ValueError):
@@ -35,8 +35,15 @@ class DetectorInput(DomainModel):
 
 
 class DetectorOutput(DomainModel):
+    """``events`` are the idempotent confirmed detections (one per feature per revision).
+
+    Touch, fill and invalidation belong in ``transitions``, which map to
+    ``ta_feature_transitions`` and are not part of the ``ta_events`` unique key.
+    """
+
     features: list[TAFeature]
     events: list[TAEvent]
+    transitions: list[TAFeatureTransition] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 

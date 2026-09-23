@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field, JsonValue
+from pydantic import Field, JsonValue, model_validator
 
 from trading_core.domain.common import (
     CalcVersion,
@@ -88,7 +88,11 @@ class TAFeature(DomainModel):
     confirmation_time: UtcDatetime | None = Field(
         default=None, description="Null while the feature is still pending."
     )
+    confirmation_tz: TimezoneName | None = Field(
+        default=None, description="Set exactly when ``confirmation_time`` is set."
+    )
     as_of: UtcDatetime
+    as_of_tz: TimezoneName
     parameters: dict[str, JsonValue] = Field(
         default_factory=dict, description="Exact detector parameters used for this calculation."
     )
@@ -104,23 +108,26 @@ class TAFeature(DomainModel):
         description="e.g. 'approximation: bar-derived volume', 'roll window excluded'.",
     )
 
+    @model_validator(mode="after")
+    def _confirmation_carries_its_zone(self) -> TAFeature:
+        if (self.confirmation_time is None) != (self.confirmation_tz is None):
+            msg = "confirmation_time and confirmation_tz must be set together"
+            raise ValueError(msg)
+        return self
 
-TAEventType = Literal[
-    "confirmed",
-    "touched",
-    "midpoint_touched",
-    "filled",
-    "revisited",
-    "consumed",
-    "invalidated",
-    "expired",
-]
+
+TAEventType = Literal["confirmed"]
+"""Detection rows only. Touch, fill and invalidation go to :class:`TAFeatureTransition`."""
 
 
 class TAEvent(DomainModel):
-    """A state transition of a feature. Unique on
-    (instrument, timeframe, detector, calc_version, origin_time, data_revision) so re-detection is
-    idempotent and later bars cannot rewrite an earlier log for the same revision."""
+    """The idempotent detection row for one feature.
+
+    Unique on (instrument, contract_code, timeframe, detector, calc_version, origin_time,
+    data_revision). ``contract_code`` is part of the key so two listed months of one root can
+    share an origin time. ``event_type`` is always ``confirmed``; later lifecycle is a
+    :class:`TAFeatureTransition`, which keeps re-detection from rewriting an earlier log.
+    """
 
     id: UUID
     feature_id: UUID
@@ -131,9 +138,26 @@ class TAEvent(DomainModel):
     calc_version: CalcVersion
     origin_time: UtcDatetime
     data_revision: DataRevision
-    event_type: TAEventType
+    event_type: TAEventType = "confirmed"
     event_time: UtcDatetime = Field(description="Close time of the bar that produced the event.")
+    event_tz: TimezoneName
     direction: Direction
     levels: list[Level] = Field(default_factory=list)
     details: dict[str, JsonValue] = Field(default_factory=dict)
     provenance: Provenance
+
+
+class TAFeatureTransition(DomainModel):
+    """Post-confirmation lifecycle (touch, fill, invalidation) for one data revision.
+
+    Not part of the ``ta_events`` idempotency key. ``feature_id`` is the id the detector assigned
+    on the :class:`TAFeature`.
+    """
+
+    feature_id: UUID
+    from_state: FeatureState
+    to_state: FeatureState
+    bar_time: UtcDatetime = Field(description="Close time of the completed bar that caused this.")
+    bar_tz: TimezoneName
+    data_revision: DataRevision
+    details: dict[str, JsonValue] = Field(default_factory=dict)

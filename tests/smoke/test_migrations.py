@@ -193,10 +193,11 @@ def test_ta_events_are_idempotent_per_revision(migrated: str) -> None:
             """
             insert into ta_features (detector, calc_version, instrument_id, contract_code, timeframe, session,
                                      session_calendar_id, session_calendar_version, direction, state, origin_time,
-                                     origin_tz, confirmation_time, as_of, snapshot_id, data_revision, provenance)
+                                     origin_tz, confirmation_time, confirmation_tz, as_of, as_of_tz, snapshot_id,
+                                     data_revision, provenance)
             values ('fvg', '1.0.0', %s, '6EZ6', '5m', 'current_session', 'cme_globex_fx', '1.0.0', 'bullish',
                     'confirmed', '2026-08-31 22:15+00', 'America/Chicago', '2026-08-31 22:25+00',
-                    '2026-08-31 22:25+00', %s, 'rev-1', 'fixture')
+                    'America/Chicago', '2026-08-31 22:25+00', 'America/Chicago', %s, 'rev-1', 'fixture')
             returning id
             """,
             (instrument_id, snapshot_id),
@@ -213,6 +214,28 @@ def test_ta_events_are_idempotent_per_revision(migrated: str) -> None:
             conn.execute(insert_event, (feature_id, instrument_id, "rev-1"))
         # A new data revision is a new log; it never rewrites the old one.
         conn.execute(insert_event, (feature_id, instrument_id, "rev-2"))
+        # Two listed months of one root may share an origin time.
+        conn.execute(
+            """
+            insert into ta_events (feature_id, instrument_id, contract_code, timeframe, detector,
+                                   calc_version, origin_time, data_revision, event_time, event_tz,
+                                   direction, provenance)
+            values (%s, %s, '6EU6', '5m', 'fvg', '1.0.0', '2026-08-31 22:15+00', 'rev-1',
+                    '2026-08-31 22:25+00', 'America/Chicago', 'bullish', 'fixture')
+            """,
+            (feature_id, instrument_id),
+        )
+        with pytest.raises(errors.CheckViolation):
+            conn.execute(
+                """
+                insert into ta_events (feature_id, instrument_id, contract_code, timeframe, detector,
+                                       calc_version, origin_time, data_revision, event_type, event_time,
+                                       event_tz, direction, provenance)
+                values (%s, %s, '6EZ6', '5m', 'fvg', '1.0.0', '2026-08-31 23:15+00', 'rev-3',
+                        'touched', '2026-08-31 23:25+00', 'America/Chicago', 'bullish', 'fixture')
+                """,
+                (feature_id, instrument_id),
+            )
 
 
 def test_tool_calls_reject_order_write_tool_names(migrated: str) -> None:
@@ -220,10 +243,11 @@ def test_tool_calls_reject_order_write_tool_names(migrated: str) -> None:
         run_id = _make_run(conn)
         conn.execute(
             "insert into tool_calls (run_id, sequence, tool_name, tool_version) "
-            "values (%s, 0, 'get_bars', '1.0.0')",
-            (run_id,),
+            "values (%s, 0, 'get_bars', '1.0.0'), (%s, 2, 'order_block', '1.0.0'), "
+            "(%s, 3, 'get_order_blocks', '1.0.0')",
+            (run_id, run_id, run_id),
         )
-        for forbidden in ("submit_order", "cancelOrder", "run_shell", "http_request"):
+        for forbidden in ("submit_order", "cancelOrder", "run_shell", "http_request", "execute"):
             with pytest.raises(errors.CheckViolation):
                 conn.execute(
                     "insert into tool_calls (run_id, sequence, tool_name, tool_version) "

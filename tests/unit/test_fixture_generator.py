@@ -58,6 +58,7 @@ def test_bars_are_consistent_with_trades_and_tick_aligned(
     assert len(bars) == TEST_SESSION_DAYS * 276
     assert all(b.contract_code == "GCZ6" and b.provenance == "fixture" for b in bars)
     assert [t.sequence for t in trades] == list(range(len(trades)))
+    assert all(trades[i].trade_time <= trades[i + 1].trade_time for i in range(len(trades) - 1))
 
     by_bar: dict[object, list[Decimal]] = {}
     volume: dict[object, Decimal] = {}

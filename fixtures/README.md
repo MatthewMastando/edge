@@ -9,6 +9,7 @@ market data or API keys. Every row and every manifest carries `provenance: fixtu
 | `contracts/instruments.yaml` | Instruments, listed futures contracts (real specifications), roll-map examples and generator parameters |
 | `session_calendars/*.yaml` | Versioned session definitions referenced by instruments and TA features |
 | `recorded/` | Recorded LLM responses replayed by `RecordedProvider` (always labeled demonstration) |
+| `ta/` | Hand-calculated TA expectations for Stage 1A. Do not put those next to the generator inputs |
 | `generated/` | Output of the generator: Parquet bars/trades plus `manifest.json` (git-ignored) |
 
 Generate:

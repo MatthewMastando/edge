@@ -72,8 +72,22 @@ class FuturesContract(DomainModel):
     contract_month: str = Field(
         pattern=r"^\d{4}-\d{2}$", description="Delivery month as YYYY-MM.", examples=["2026-12"]
     )
-    expiry_date: date = Field(description="Actual expiry / delivery date of the contract.")
+    expiry_date: date = Field(
+        description=(
+            "Published expiration date for this root. For FX that is the value/delivery date, "
+            "which can fall after last trade. For metals, energy and equity index it is the "
+            "last trade date, not the end of a physical delivery window."
+        )
+    )
     last_trade_date: date
+    last_trade_time_local: time | None = Field(
+        default=None,
+        description=(
+            "Clock time in the session calendar's timezone when the expiring contract stops "
+            "trading. Distinct from the daily settlement time (ES settles at 15:15 CT but "
+            "stops trading at 08:30 CT on expiration Friday)."
+        ),
+    )
     first_notice_date: date | None = Field(
         default=None,
         description="First notice day for physically delivered contracts; null if not applicable.",

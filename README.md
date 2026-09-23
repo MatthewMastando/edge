@@ -112,9 +112,10 @@ uv run trading-core fixtures show
   `lease_until`/`leased_by`, resumable `checkpoint`, unique `idempotency_key`.
 - `ta_events` unique on `(instrument_id, contract_code, timeframe, detector, calc_version,
   origin_time, data_revision)` so re-detection is idempotent and later bars never rewrite an
-  earlier log. Post-confirmation lifecycle (touch, fill, invalidation) goes to
-  `ta_feature_transitions`.
-- `tool_calls.tool_name` rejects order/shell/exec/http_request names at the database level.
+  earlier log. The row's `event_type` is `confirmed`. Post-confirmation lifecycle (touch, fill,
+  invalidation) goes to `ta_feature_transitions`.
+- `tool_calls.tool_name` rejects broker order writes, shell/exec and unrestricted HTTP.
+  `order_block` stays a legal tool name.
 
 ## Environment variables
 

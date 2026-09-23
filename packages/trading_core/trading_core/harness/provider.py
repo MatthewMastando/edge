@@ -7,19 +7,34 @@ commands, execute arbitrary code or perform unrestricted HTTP requests.
 
 from __future__ import annotations
 
+import re
 from typing import Literal, Protocol, runtime_checkable
 
-from pydantic import Field, JsonValue
+from pydantic import Field, JsonValue, field_validator
 
 from trading_core.domain.common import DomainModel
 from trading_core.domain.jobs import Usage
 
 MessageRole = Literal["system", "developer", "user", "assistant", "tool"]
 
-FORBIDDEN_TOOL_NAME_FRAGMENTS: frozenset[str] = frozenset(
-    {"order", "execute", "submit", "cancel_order", "modify_order", "shell", "exec", "http_request"}
+# Same expression as the tool_calls CHECK constraint. `order_block` is a detector, not an order.
+FORBIDDEN_TOOL_NAME_PATTERN = (
+    r"(place|submit|send|create|modify|amend|replace|cancel)_?orders?"
+    r"|orders?_(submit|submission|entry|execution|placement|cancel)"
+    r"|(^|_)(shell|exec|execute|eval)($|_)"
+    r"|http_request"
+    r"|paper_?trad"
 )
-"""Tool registries must reject any tool whose name contains one of these fragments."""
+_FORBIDDEN_TOOL_NAME = re.compile(FORBIDDEN_TOOL_NAME_PATTERN, re.IGNORECASE)
+
+
+def is_forbidden_tool_name(name: str) -> bool:
+    """True for broker order writes, shell/exec and unrestricted HTTP.
+
+    Substring checks are intentionally not used: ``order_block`` and ``get_order_blocks`` are
+    required TA tools and must stay allowed.
+    """
+    return _FORBIDDEN_TOOL_NAME.search(name) is not None
 
 
 class ToolSpec(DomainModel):
@@ -33,6 +48,14 @@ class ToolSpec(DomainModel):
     counts_as_external_retrieval: bool = Field(
         default=False, description="True for web/search/source fetches subject to the 12-call cap."
     )
+
+    @field_validator("name")
+    @classmethod
+    def _reject_broker_and_shell_tools(cls, name: str) -> str:
+        if is_forbidden_tool_name(name):
+            msg = f"tool name is not allowed: {name}"
+            raise ValueError(msg)
+        return name
 
 
 class ToolCall(DomainModel):

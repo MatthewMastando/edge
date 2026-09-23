@@ -443,7 +443,7 @@ export type components = {
             /**
              * Expiry Date
              * Format: date
-             * @description Actual expiry / delivery date of the contract.
+             * @description Published expiration date for this root. For FX that is the value/delivery date, which can fall after last trade. For metals, energy and equity index it is the last trade date, not the end of a physical delivery window.
              */
             expiry_date: string;
             /**
@@ -472,6 +472,11 @@ export type components = {
              * Format: date
              */
             last_trade_date: string;
+            /**
+             * Last Trade Time Local
+             * @description Clock time in the session calendar's timezone when the expiring contract stops trading. Distinct from the daily settlement time (ES settles at 15:15 CT but stops trading at 08:30 CT on expiration Friday).
+             */
+            last_trade_time_local?: string | null;
             /**
              * Point Multiplier
              * Format: decimal
@@ -723,6 +728,15 @@ export type components = {
              */
             scheduled_for: string;
             /**
+             * Scheduled Tz
+             * @description IANA timezone name of the original timestamp, e.g. America/Chicago.
+             * @default UTC
+             * @example America/Chicago
+             * @example America/New_York
+             * @example UTC
+             */
+            scheduled_tz: string;
+            /**
              * Started At
              * @default null
              */
@@ -777,6 +791,14 @@ export type components = {
              * @description Time the capture was taken.
              */
             as_of: string;
+            /**
+             * As Of Tz
+             * @description IANA zone the capture was taken in; ``as_of`` itself is UTC.
+             * @example America/Chicago
+             * @example America/New_York
+             * @example UTC
+             */
+            as_of_tz: string;
             /**
              * Content Hash
              * @description SHA-256 over the canonical row encoding; detects drift.
@@ -1222,9 +1244,12 @@ export type components = {
         };
         /**
          * TAEvent
-         * @description A state transition of a feature. Unique on
-         *     (instrument, timeframe, detector, calc_version, origin_time, data_revision) so re-detection is
-         *     idempotent and later bars cannot rewrite an earlier log for the same revision.
+         * @description The idempotent detection row for one feature.
+         *
+         *     Unique on (instrument, contract_code, timeframe, detector, calc_version, origin_time,
+         *     data_revision). ``contract_code`` is part of the key so two listed months of one root can
+         *     share an origin time. ``event_type`` is always ``confirmed``; later lifecycle is a
+         *     :class:`TAFeatureTransition`, which keeps re-detection from rewriting an earlier log.
          */
         TAEvent: {
             /**
@@ -1265,9 +1290,18 @@ export type components = {
             event_time: string;
             /**
              * Event Type
-             * @enum {string}
+             * @default confirmed
+             * @constant
              */
-            event_type: "confirmed" | "touched" | "midpoint_touched" | "filled" | "revisited" | "consumed" | "invalidated" | "expired";
+            event_type: "confirmed";
+            /**
+             * Event Tz
+             * @description IANA timezone name of the original timestamp, e.g. America/Chicago.
+             * @example America/Chicago
+             * @example America/New_York
+             * @example UTC
+             */
+            event_tz: string;
             /**
              * Feature Id
              * Format: uuid
@@ -1314,6 +1348,14 @@ export type components = {
              */
             as_of: string;
             /**
+             * As Of Tz
+             * @description IANA timezone name of the original timestamp, e.g. America/Chicago.
+             * @example America/Chicago
+             * @example America/New_York
+             * @example UTC
+             */
+            as_of_tz: string;
+            /**
              * Calc Version
              * @description Semantic version of the calculation that produced this object.
              * @example 1.0.0
@@ -1325,6 +1367,12 @@ export type components = {
              * @default null
              */
             confirmation_time: string | null;
+            /**
+             * Confirmation Tz
+             * @description Set exactly when ``confirmation_time`` is set.
+             * @default null
+             */
+            confirmation_tz: string | null;
             /**
              * Contract Code
              * @default null
@@ -1418,6 +1466,53 @@ export type components = {
              * @description e.g. 'approximation: bar-derived volume', 'roll window excluded'.
              */
             warnings?: string[];
+        };
+        /**
+         * TAFeatureTransition
+         * @description Post-confirmation lifecycle (touch, fill, invalidation) for one data revision.
+         *
+         *     Not part of the ``ta_events`` idempotency key. ``feature_id`` is the id the detector assigned
+         *     on the :class:`TAFeature`.
+         */
+        TAFeatureTransition: {
+            /**
+             * Bar Time
+             * Format: date-time
+             * @description Close time of the completed bar that caused this.
+             */
+            bar_time: string;
+            /**
+             * Bar Tz
+             * @description IANA timezone name of the original timestamp, e.g. America/Chicago.
+             * @example America/Chicago
+             * @example America/New_York
+             * @example UTC
+             */
+            bar_tz: string;
+            /**
+             * Data Revision
+             * @description Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.
+             */
+            data_revision: string;
+            /** Details */
+            details?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /**
+             * Feature Id
+             * Format: uuid
+             */
+            feature_id: string;
+            /**
+             * From State
+             * @enum {string}
+             */
+            from_state: "pending" | "confirmed" | "touched" | "midpoint_touched" | "partially_filled" | "filled" | "revisited" | "consumed" | "invalidated" | "expired";
+            /**
+             * To State
+             * @enum {string}
+             */
+            to_state: "pending" | "confirmed" | "touched" | "midpoint_touched" | "partially_filled" | "filled" | "revisited" | "consumed" | "invalidated" | "expired";
         };
         /** Thesis */
         Thesis: {

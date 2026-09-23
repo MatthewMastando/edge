@@ -112,14 +112,16 @@ instruments:
       size_decimals: 8
 
 futures_contracts:
-  # Euro FX Dec 2026. Physically delivered on the third Wednesday (2026-12-16);
-  # trading terminates two business days before delivery (2026-12-14, 09:16 CT).
+  # Euro FX Dec 2026. Physically delivered on the third Wednesday (2026-12-16, a business
+  # day). Trading terminates at 09:16 CT on the second business day before delivery
+  # (Mon 2026-12-14). FX has no COMEX-style first notice day.
   - contract_code: "6EZ6"
     root: "6E"
     exchange: CME
     contract_month: "2026-12"
     expiry_date: 2026-12-16
     last_trade_date: 2026-12-14
+    last_trade_time_local: "09:16:00"
     first_notice_date: null
     tick_size: "0.00005"
     tick_value: "6.25"
@@ -129,14 +131,17 @@ futures_contracts:
     settlement_type: physical
     settlement_time_local: "14:00:00"
 
-  # Gold Dec 2026. Physically delivered; last trade is the third-last business day of the
-  # delivery month (2026-12-29); first notice day is the last business day before it (2026-11-30).
+  # Gold Dec 2026. Trading terminates 12:30 CT on the third-last business day of the
+  # delivery month. Dec 25 2026 is a holiday; Dec 31, 30 and 29 are business days, so last
+  # trade is 2026-12-29. First notice day is the last business day of the preceding month
+  # (Mon 2026-11-30), not the day before last trade. Delivery can continue through the month.
   - contract_code: "GCZ6"
     root: "GC"
     exchange: COMEX
     contract_month: "2026-12"
     expiry_date: 2026-12-29
     last_trade_date: 2026-12-29
+    last_trade_time_local: "12:30:00"
     first_notice_date: 2026-11-30
     tick_size: "0.10"
     tick_value: "10.00"
@@ -146,14 +151,17 @@ futures_contracts:
     settlement_type: physical
     settlement_time_local: "12:30:00"
 
-  # WTI Crude Nov 2026. Trading terminates three business days before the 25th calendar day of
-  # the month prior to delivery (25 Oct 2026 is a Sunday -> 23 Oct -> 2026-10-20).
+  # WTI Crude Nov 2026. Trading ceases on the third business day prior to the 25th calendar
+  # day of the month before delivery. 25 Oct 2026 is a Sunday, so the anchor is Fri 23 Oct
+  # and last trade is Tue 2026-10-20, at 13:30 CT (14:30 ET). No separate first notice day;
+  # delivery is ratable across November after termination. expiry_date is that termination.
   - contract_code: "CLX6"
     root: "CL"
     exchange: NYMEX
     contract_month: "2026-11"
     expiry_date: 2026-10-20
     last_trade_date: 2026-10-20
+    last_trade_time_local: "13:30:00"
     first_notice_date: null
     tick_size: "0.01"
     tick_value: "10.00"
@@ -163,14 +171,16 @@ futures_contracts:
     settlement_type: physical
     settlement_time_local: "13:30:00"
 
-  # E-mini S&P 500 Dec 2026. Cash settled to the special opening quotation on the third Friday
-  # (2026-12-18); trading terminates 08:30 CT that day.
+  # E-mini S&P 500 Dec 2026. Cash settled to the special opening quotation. Trading terminates
+  # 08:30 CT (09:30 ET) on the third Friday (2026-12-18). Daily settlement is the 15:14:30-15:15:00
+  # CT VWAP, which is not the expiration clock.
   - contract_code: "ESZ6"
     root: "ES"
     exchange: CME
     contract_month: "2026-12"
     expiry_date: 2026-12-18
     last_trade_date: 2026-12-18
+    last_trade_time_local: "08:30:00"
     first_notice_date: null
     tick_size: "0.25"
     tick_value: "12.50"
@@ -178,7 +188,7 @@ futures_contracts:
     currency: USD
     session_calendar_id: cme_globex_equity_index
     settlement_type: cash
-    settlement_time_local: "15:00:00"
+    settlement_time_local: "15:15:00"
 
 # Example roll entries for continuous-series handling. The generator does not produce the prior
 # contracts; these exist so Stage 1A can test roll-window exclusion against real-shaped data.

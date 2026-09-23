@@ -50,6 +50,7 @@ create table public.futures_contracts (
   contract_month text not null check (contract_month ~ '^\d{4}-\d{2}$'),
   expiry_date date not null,
   last_trade_date date not null,
+  last_trade_time_local time,           -- expiration-day stop, distinct from daily settlement
   first_notice_date date,
   tick_size numeric not null check (tick_size > 0),
   tick_value numeric not null check (tick_value >= 0),
@@ -150,7 +151,9 @@ create table public.ta_features (
   origin_time timestamptz not null,
   origin_tz text not null,
   confirmation_time timestamptz,
+  confirmation_tz text,
   as_of timestamptz not null,
+  as_of_tz text not null,
   levels jsonb not null default '[]'::jsonb,
   parameters jsonb not null default '{}'::jsonb,
   details jsonb not null default '{}'::jsonb,
@@ -160,7 +163,11 @@ create table public.ta_features (
   provenance text not null check (provenance in ('fixture', 'recorded', 'live')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  check (confirmation_time is null or confirmation_time >= origin_time)
+  check (confirmation_time is null or confirmation_time >= origin_time),
+  check (
+    (confirmation_time is null and confirmation_tz is null)
+    or (confirmation_time is not null and confirmation_tz is not null)
+  )
 );
 
 create index ta_features_lookup_idx
@@ -184,9 +191,9 @@ create table public.ta_events (
   calc_version text not null check (calc_version ~ '^\d+\.\d+\.\d+$'),
   origin_time timestamptz not null,
   data_revision text not null,
-  event_type text not null default 'confirmed' check (event_type in
-    ('confirmed', 'touched', 'midpoint_touched', 'filled', 'revisited', 'consumed',
-     'invalidated', 'expired')),
+  -- Detection log only. Lifecycle after confirmation is ta_feature_transitions, so a second
+  -- event_type for the same origin cannot collide with this unique key.
+  event_type text not null default 'confirmed' check (event_type = 'confirmed'),
   event_time timestamptz not null,
   event_tz text not null,
   direction text not null check (direction in ('bullish', 'bearish', 'neutral')),
@@ -207,6 +214,7 @@ create table public.ta_feature_transitions (
   from_state text not null,
   to_state text not null,
   bar_time timestamptz not null,        -- close time of the completed bar that caused the change
+  bar_tz text not null,
   data_revision text not null,
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),

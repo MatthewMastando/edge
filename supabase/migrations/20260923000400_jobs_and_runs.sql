@@ -176,8 +176,10 @@ create table public.tool_calls (
   duration_ms integer,
   created_at timestamptz not null default now(),
   unique (run_id, sequence),
-  -- No tool may write broker orders, run shell commands or make unrestricted HTTP requests.
-  check (tool_name !~* '(order|execute|submit|shell|exec|http_request)')
+  -- Broker order writes, shell/exec and unrestricted HTTP are rejected.
+  -- `order_block` / `get_order_blocks` stay allowed: they are the order-block detector.
+  -- Keep this expression identical to trading_core.harness.FORBIDDEN_TOOL_NAME_PATTERN.
+  check (tool_name !~* '(place|submit|send|create|modify|amend|replace|cancel)_?orders?|orders?_(submit|submission|entry|execution|placement|cancel)|(^|_)(shell|exec|execute|eval)($|_)|http_request|paper_?trad')
 );
 
 create table public.notifications (

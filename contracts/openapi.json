@@ -607,7 +607,7 @@
             "type": "string"
           },
           "expiry_date": {
-            "description": "Actual expiry / delivery date of the contract.",
+            "description": "Published expiration date for this root. For FX that is the value/delivery date, which can fall after last trade. For metals, energy and equity index it is the last trade date, not the end of a physical delivery window.",
             "format": "date",
             "title": "Expiry Date",
             "type": "string"
@@ -645,6 +645,19 @@
             "format": "date",
             "title": "Last Trade Date",
             "type": "string"
+          },
+          "last_trade_time_local": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clock time in the session calendar's timezone when the expiring contract stops trading. Distinct from the daily settlement time (ES settles at 15:15 CT but stops trading at 08:30 CT on expiration Friday).",
+            "title": "Last Trade Time Local"
           },
           "point_multiplier": {
             "description": "Exact decimal encoded as a string (money, prices, sizes).",
@@ -1097,6 +1110,19 @@
             "title": "Scheduled For",
             "type": "string"
           },
+          "scheduled_tz": {
+            "default": "UTC",
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Scheduled Tz",
+            "type": "string"
+          },
           "started_at": {
             "anyOf": [
               {
@@ -1193,6 +1219,18 @@
             "description": "Time the capture was taken.",
             "format": "date-time",
             "title": "As Of",
+            "type": "string"
+          },
+          "as_of_tz": {
+            "description": "IANA zone the capture was taken in; ``as_of`` itself is UTC.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of Tz",
             "type": "string"
           },
           "content_hash": {
@@ -1316,6 +1354,7 @@
           "range_start",
           "range_end",
           "as_of",
+          "as_of_tz",
           "provider",
           "provenance",
           "data_revision",
@@ -2164,7 +2203,7 @@
       },
       "TAEvent": {
         "additionalProperties": false,
-        "description": "A state transition of a feature. Unique on\n(instrument, timeframe, detector, calc_version, origin_time, data_revision) so re-detection is\nidempotent and later bars cannot rewrite an earlier log for the same revision.",
+        "description": "The idempotent detection row for one feature.\n\nUnique on (instrument, contract_code, timeframe, detector, calc_version, origin_time,\ndata_revision). ``contract_code`` is part of the key so two listed months of one root can\nshare an origin time. ``event_type`` is always ``confirmed``; later lifecycle is a\n:class:`TAFeatureTransition`, which keeps re-detection from rewriting an earlier log.",
         "properties": {
           "calc_version": {
             "description": "Semantic version of the calculation that produced this object.",
@@ -2236,17 +2275,21 @@
             "type": "string"
           },
           "event_type": {
-            "enum": [
-              "confirmed",
-              "touched",
-              "midpoint_touched",
-              "filled",
-              "revisited",
-              "consumed",
-              "invalidated",
-              "expired"
-            ],
+            "const": "confirmed",
+            "default": "confirmed",
             "title": "Event Type",
+            "type": "string"
+          },
+          "event_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Event Tz",
             "type": "string"
           },
           "feature_id": {
@@ -2307,8 +2350,8 @@
           "calc_version",
           "origin_time",
           "data_revision",
-          "event_type",
           "event_time",
+          "event_tz",
           "direction",
           "provenance"
         ],
@@ -2322,6 +2365,18 @@
           "as_of": {
             "format": "date-time",
             "title": "As Of",
+            "type": "string"
+          },
+          "as_of_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "As Of Tz",
             "type": "string"
           },
           "calc_version": {
@@ -2346,6 +2401,27 @@
             "default": null,
             "description": "Null while the feature is still pending.",
             "title": "Confirmation Time"
+          },
+          "confirmation_tz": {
+            "anyOf": [
+              {
+                "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+                "examples": [
+                  "America/Chicago",
+                  "America/New_York",
+                  "UTC"
+                ],
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Set exactly when ``confirmation_time`` is set.",
+            "title": "Confirmation Tz"
           },
           "contract_code": {
             "anyOf": [
@@ -2533,11 +2609,97 @@
           "origin_time",
           "origin_tz",
           "as_of",
+          "as_of_tz",
           "snapshot_id",
           "data_revision",
           "provenance"
         ],
         "title": "TAFeature",
+        "type": "object"
+      },
+      "TAFeatureTransition": {
+        "additionalProperties": false,
+        "description": "Post-confirmation lifecycle (touch, fill, invalidation) for one data revision.\n\nNot part of the ``ta_events`` idempotency key. ``feature_id`` is the id the detector assigned\non the :class:`TAFeature`.",
+        "properties": {
+          "bar_time": {
+            "description": "Close time of the completed bar that caused this.",
+            "format": "date-time",
+            "title": "Bar Time",
+            "type": "string"
+          },
+          "bar_tz": {
+            "description": "IANA timezone name of the original timestamp, e.g. America/Chicago.",
+            "examples": [
+              "America/Chicago",
+              "America/New_York",
+              "UTC"
+            ],
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Bar Tz",
+            "type": "string"
+          },
+          "data_revision": {
+            "description": "Identifier of the exact data snapshot a calculation ran against. Re-running on the same revision must be idempotent.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "feature_id": {
+            "format": "uuid",
+            "title": "Feature Id",
+            "type": "string"
+          },
+          "from_state": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "touched",
+              "midpoint_touched",
+              "partially_filled",
+              "filled",
+              "revisited",
+              "consumed",
+              "invalidated",
+              "expired"
+            ],
+            "title": "From State",
+            "type": "string"
+          },
+          "to_state": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "touched",
+              "midpoint_touched",
+              "partially_filled",
+              "filled",
+              "revisited",
+              "consumed",
+              "invalidated",
+              "expired"
+            ],
+            "title": "To State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature_id",
+          "from_state",
+          "to_state",
+          "bar_time",
+          "bar_tz",
+          "data_revision"
+        ],
+        "title": "TAFeatureTransition",
         "type": "object"
       },
       "Thesis": {

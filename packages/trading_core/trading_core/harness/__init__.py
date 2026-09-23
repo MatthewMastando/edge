@@ -4,7 +4,7 @@ The job runner, workflow stages, tool registry and validators land in Stage 1B.
 """
 
 from trading_core.harness.provider import (
-    FORBIDDEN_TOOL_NAME_FRAGMENTS,
+    FORBIDDEN_TOOL_NAME_PATTERN,
     Message,
     MessageRole,
     ModelRequest,
@@ -13,6 +13,7 @@ from trading_core.harness.provider import (
     ToolCall,
     ToolResult,
     ToolSpec,
+    is_forbidden_tool_name,
 )
 from trading_core.harness.recorded import (
     RECORDED_PROVIDER_NAME,
@@ -23,7 +24,7 @@ from trading_core.harness.recorded import (
 )
 
 __all__ = [
-    "FORBIDDEN_TOOL_NAME_FRAGMENTS",
+    "FORBIDDEN_TOOL_NAME_PATTERN",
     "RECORDED_PROVIDER_NAME",
     "Message",
     "MessageRole",
@@ -37,4 +38,5 @@ __all__ = [
     "ToolCall",
     "ToolResult",
     "ToolSpec",
+    "is_forbidden_tool_name",
 ]

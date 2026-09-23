@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from trading_core.storage.base import StoredObject
 
 GENERATOR_NAME = "trading_core.fixtures.generator"
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.0.1"
 DEFAULT_SEED = 20260923
 DEFAULT_START_DATE = date(2026, 8, 31)
 DEFAULT_SESSION_DAYS = 10
@@ -132,10 +132,13 @@ def generate_series(
         n = int(counts[bar_index])
         window = slice(cursor, cursor + n)
         cursor += n
-        bar_ticks = ticks[window]
-        bar_sizes = raw_sizes[window]
-        bar_offsets = np.sort(offsets[window])
-        bar_sides = sides[window] if sides is not None else None
+        # Keep price, size and side attached to the offset. Sorting offsets alone made
+        # open/close follow generation order rather than trade time.
+        order = np.argsort(offsets[window], kind="stable")
+        bar_ticks = ticks[window][order]
+        bar_sizes = raw_sizes[window][order]
+        bar_offsets = offsets[window][order]
+        bar_sides = sides[window][order] if sides is not None else None
 
         volume = Decimal(0)
         notional = Decimal(0)
@@ -203,6 +206,7 @@ def _snapshot(
     data_revision: str,
     range_start: datetime,
     range_end: datetime,
+    as_of_tz: str,
 ) -> MarketSnapshot:
     return MarketSnapshot(
         id=fixture_uuid("snapshot", f"{data_revision}:{stored.key}"),
@@ -213,6 +217,7 @@ def _snapshot(
         range_start=range_start,
         range_end=range_end,
         as_of=range_end,
+        as_of_tz=as_of_tz,
         provider="fixture",
         provenance="fixture",
         data_revision=data_revision,
@@ -290,6 +295,7 @@ def generate_fixtures(
                     data_revision=data_revision,
                     range_start=range_start,
                     range_end=range_end,
+                    as_of_tz=calendar.timezone,
                 )
             )
             snapshots.append(
@@ -302,6 +308,7 @@ def generate_fixtures(
                     data_revision=data_revision,
                     range_start=range_start,
                     range_end=range_end,
+                    as_of_tz=calendar.timezone,
                 )
             )
 

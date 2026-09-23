@@ -8,7 +8,13 @@ from uuid import UUID
 
 from pydantic import Field, JsonValue
 
-from trading_core.domain.common import DecimalStr, DomainModel, Provenance, UtcDatetime
+from trading_core.domain.common import (
+    DecimalStr,
+    DomainModel,
+    Provenance,
+    TimezoneName,
+    UtcDatetime,
+)
 
 JobState = Literal[
     "queued",
@@ -75,6 +81,7 @@ class Job(DomainModel):
     routine_id: UUID | None = None
     conversation_id: UUID | None = None
     scheduled_for: UtcDatetime
+    scheduled_tz: TimezoneName = "UTC"
     lease_until: UtcDatetime | None = None
     leased_by: str | None = Field(default=None, description="Worker id holding the lease.")
     checkpoint: dict[str, JsonValue] = Field(

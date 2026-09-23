@@ -53,6 +53,7 @@ from trading_core.domain.ta import (
     TAEvent,
     TAEventType,
     TAFeature,
+    TAFeatureTransition,
 )
 from trading_core.domain.thesis import (
     Catalyst,
@@ -82,6 +83,7 @@ CONTRACT_MODELS: tuple[type[DomainModel], ...] = (
     Level,
     TAFeature,
     TAEvent,
+    TAFeatureTransition,
     FeatureReference,
     EvidenceItem,
     Catalyst,
@@ -144,6 +146,7 @@ __all__ = [
     "TAEvent",
     "TAEventType",
     "TAFeature",
+    "TAFeatureTransition",
     "Thesis",
     "ThesisVersions",
     "Timeframe",

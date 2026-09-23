@@ -15,6 +15,7 @@ export type Trade = Schemas["Trade"];
 export type MarketSnapshot = Schemas["MarketSnapshot"];
 export type TAFeature = Schemas["TAFeature"];
 export type TAEvent = Schemas["TAEvent"];
+export type TAFeatureTransition = Schemas["TAFeatureTransition"];
 export type Thesis = Schemas["Thesis"];
 export type Job = Schemas["Job"];
 export type Run = Schemas["Run"];

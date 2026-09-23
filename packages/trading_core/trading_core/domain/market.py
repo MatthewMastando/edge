@@ -75,6 +75,9 @@ class MarketSnapshot(DomainModel):
     range_start: UtcDatetime
     range_end: UtcDatetime
     as_of: UtcDatetime = Field(description="Time the capture was taken.")
+    as_of_tz: TimezoneName = Field(
+        description="IANA zone the capture was taken in; ``as_of`` itself is UTC."
+    )
     provider: str = Field(examples=["fixture", "databento", "alpaca", "coinbase"])
     provenance: Provenance
     data_revision: DataRevision
