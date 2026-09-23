@@ -258,10 +258,11 @@ async def test_recorded_workflow_resumes_without_duplicate_artifacts(
         runs = await fetch_one(
             conn, "select count(*) as n from runs where job_id = :job_id", {"job_id": job.id}
         )
-        notes = await jobs.count_notifications(conn, f"research:{job.id}:result")
+        notes = await jobs.count_notifications(conn, f"research:{job.id}:new_research")
     assert revisions is not None and as_int(revisions["n"]) == 1
     assert runs is not None and as_int(runs["n"]) == 1
-    assert notes == 1
+    # Recorded 6EZ6 thesis is insufficient evidence, so it is not an actionable alert.
+    assert notes == 0
 
     async with engine.begin() as conn:
         third = await jobs.lease_job(conn, job_id=job.id, worker_id="resume-3", lease_seconds=30)
@@ -352,10 +353,10 @@ async def test_lost_lease_during_persist_does_not_keep_a_second_revision(
         runs = await fetch_one(
             conn, "select count(*) as n from runs where job_id = :job_id", {"job_id": job.id}
         )
-        notes = await jobs.count_notifications(conn, f"research:{job.id}:result")
+        notes = await jobs.count_notifications(conn, f"research:{job.id}:new_research")
     assert revisions is not None and as_int(revisions["n"]) == 1
     assert runs is not None and as_int(runs["n"]) == 1
-    assert notes == 1
+    assert notes == 0
 
 
 async def test_budget_ceiling_stops_the_run(
@@ -417,13 +418,13 @@ async def test_evidence_cap_returns_partial_once(
             "select count(*) as n from artifact_revisions where run_id = :run_id",
             {"run_id": run_id},
         )
-        notes = await jobs.count_notifications(conn, f"research:{job.id}:result")
+        notes = await jobs.count_notifications(conn, f"research:{job.id}:new_research")
         again = await jobs.lease_job(
             conn, job_id=job.id, worker_id="token-worker", lease_seconds=30
         )
     assert run is not None and run.status == "partial"
     assert revisions is not None and as_int(revisions["n"]) == 1
-    assert notes == 1
+    assert notes == 0
     assert again is None
 
 

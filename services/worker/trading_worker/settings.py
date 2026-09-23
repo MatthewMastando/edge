@@ -38,6 +38,9 @@ class WorkerSettings(BaseSettings):
     monthly_ai_search_usd: Decimal = Field(
         default=Decimal("100"), alias="BUDGET_AI_SEARCH_MONTHLY_USD"
     )
+    monthly_market_data_usd: Decimal = Field(
+        default=Decimal("0"), alias="BUDGET_MARKET_DATA_MONTHLY_USD"
+    )
     llm_reserve_usd: Decimal = Field(default=Decimal("0.02"), alias="RESEARCH_LLM_RESERVE_USD")
     retrieval_reserve_usd: Decimal = Field(
         default=Decimal("0.01"), alias="RESEARCH_RETRIEVAL_RESERVE_USD"

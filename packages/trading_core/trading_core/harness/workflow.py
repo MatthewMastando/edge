@@ -17,6 +17,8 @@ from uuid import UUID, uuid4
 
 from pydantic import JsonValue, ValidationError
 
+from trading_core.automation.alerts import decide_alert
+from trading_core.automation.hypotheses import freeze_thesis
 from trading_core.data.adapter import BarsRequest, TradesRequest, UnknownSymbolError
 from trading_core.domain.jobs import Job, JobState, RunStage, Usage
 from trading_core.domain.market import BarSeries, MarketSnapshot, TradeBatch
@@ -28,7 +30,7 @@ from trading_core.harness.annotations import (
     calculations_from_rows,
     stamp_feature,
 )
-from trading_core.harness.budget import BudgetService
+from trading_core.harness.budget import BudgetExceededError, BudgetService
 from trading_core.harness.checkpoints import ResearchCheckpoint, dump_checkpoint
 from trading_core.harness.deps import (
     CORE_INSTRUCTIONS,
@@ -40,13 +42,20 @@ from trading_core.harness.deps import (
 )
 from trading_core.harness.errors import LeaseLostError, WorkflowPausedError
 from trading_core.harness.limits import estimate_tokens
-from trading_core.harness.provider import Message, ModelRequest, ToolResult
+from trading_core.harness.provider import Message, ModelRequest, ModelResponse, ToolResult
 from trading_core.harness.secrets import redact
 from trading_core.harness.thesis_builder import assemble_thesis
-from trading_core.harness.tools import ToolSession, build_research_registry
+from trading_core.harness.tools import ToolRegistry, ToolSession, build_research_registry
 from trading_core.harness.validation import attach_validation, repair_thesis, validate_thesis
 from trading_core.storage.base import ObjectNotFoundError
-from trading_core.storage.repositories import artifacts, jobs, market, reference, sources
+from trading_core.storage.repositories import (
+    artifacts,
+    automation,
+    jobs,
+    market,
+    reference,
+    sources,
+)
 from trading_core.storage.repositories.common import as_str, as_uuid
 from trading_core.storage.repositories.conversations import insert_assistant_once
 from trading_core.storage.schemas import (
@@ -170,7 +179,7 @@ class ResearchWorkflow:
         if stage == "resolve_instrument":
             return await self._resolve(job, checkpoint, payload)
         if stage == "capture_snapshot":
-            return await self._capture(checkpoint, payload)
+            return await self._capture(job, checkpoint, payload)
         if stage == "deterministic_ta":
             return await self._ta(checkpoint, payload)
         if stage == "gather_context":
@@ -226,10 +235,11 @@ class ResearchWorkflow:
         )
 
     async def _capture(
-        self, checkpoint: ResearchCheckpoint, payload: ResearchPayload
+        self, job: Job, checkpoint: ResearchCheckpoint, payload: ResearchPayload
     ) -> ResearchCheckpoint:
         if checkpoint.bars_snapshot_id is not None:
             return checkpoint
+        await self._record_market_data(job, checkpoint)
         instrument_id = _required_uuid(checkpoint.instrument_id, "instrument")
         bars = await self._deps.adapter.get_bars(
             BarsRequest(symbol=payload.symbol, timeframe=payload.timeframe, limit=5000)
@@ -460,6 +470,15 @@ class ResearchWorkflow:
     ) -> ResearchCheckpoint:
         if checkpoint.excerpt_ids:
             return checkpoint
+        if payload.tier == "brief":
+            return checkpoint.model_copy(
+                update={
+                    "warnings": [
+                        *checkpoint.warnings,
+                        "brief tier: web retrieval skipped",
+                    ],
+                }
+            )
         if checkpoint.retrievals_used >= self._deps.limits.max_external_retrievals:
             return checkpoint.model_copy(
                 update={
@@ -521,7 +540,7 @@ class ResearchWorkflow:
         if checkpoint.thesis is not None:
             return checkpoint
         run_id = _required_uuid(checkpoint.run_id, "run")
-        registry = build_research_registry()
+        registry = build_research_registry(include_web=payload.tier != "brief")
         budget = self._budget(checkpoint, job)
         session = ToolSession(
             deps=self._deps,
@@ -556,48 +575,15 @@ class ResearchWorkflow:
             model=self._deps.model,
             recording_id=payload.recording_id,
         )
-        response = None
-        tool_results: list[ToolResult] = []
-        evidence_tokens = estimate_tokens(packet)
-        for _iteration in range(self._deps.limits.max_model_iterations):
-            self._require_lease(job)
-            if self._expired():
-                await self._pause(job, checkpoint, "timeout")
-            reservation = await budget.reserve(
-                category="llm",
-                provider=self._deps.provider.name,
-                estimate=self._deps.limits.llm_reserve_usd,
-                unit_type="calls",
-            )
-            try:
-                response = await self._deps.provider.respond(
-                    request.model_copy(update={"tool_results": tool_results})
-                )
-            except Exception:
-                await budget.reconcile(reservation, Decimal(0))
-                raise
-            actual = response.usage.actual_cost_usd or Decimal(0)
-            await budget.reconcile(reservation, actual)
-            if not response.tool_calls:
-                break
-            over_pack = False
-            for call in response.tool_calls:
-                self._require_lease(job)
-                result = await registry.invoke(session, call)
-                addition = estimate_tokens("" if result.output is None else str(result.output))
-                if evidence_tokens + addition > self._deps.limits.max_evidence_tokens:
-                    checkpoint = _mark_partial(checkpoint, "evidence_token_cap")
-                    over_pack = True
-                    break
-                evidence_tokens += addition
-                tool_results.append(result)
-            if over_pack:
-                break
-            if session.retrievals >= self._deps.limits.max_external_retrievals:
-                checkpoint = _mark_partial(checkpoint, "retrieval_cap")
-                break
-        else:
-            checkpoint = _mark_partial(checkpoint, "iteration_cap")
+        response, checkpoint = await self._model_rounds(
+            job,
+            checkpoint,
+            request,
+            budget,
+            registry,
+            session,
+            estimate_tokens(packet),
+        )
         raw_json = response.output_json if response is not None else None
         model_json = raw_json if isinstance(raw_json, dict) else {}
         model_text = response.output_text if response is not None else None
@@ -633,6 +619,75 @@ class ResearchWorkflow:
                 "excerpt_ids": session.excerpt_ids,
             }
         )
+
+    async def _model_rounds(
+        self,
+        job: Job,
+        checkpoint: ResearchCheckpoint,
+        request: ModelRequest,
+        budget: BudgetService,
+        registry: ToolRegistry,
+        session: ToolSession,
+        evidence_tokens: int,
+    ) -> tuple[ModelResponse | None, ResearchCheckpoint]:
+        """Stop or return a partial thesis when a later reserve hits the monthly ceiling."""
+        response: ModelResponse | None = None
+        tool_results: list[ToolResult] = []
+        for _iteration in range(self._deps.limits.max_model_iterations):
+            self._require_lease(job)
+            if self._expired():
+                await self._pause(job, checkpoint, "timeout")
+            try:
+                reservation = await budget.reserve(
+                    category="llm",
+                    provider=self._deps.provider.name,
+                    estimate=self._deps.limits.llm_reserve_usd,
+                    unit_type="calls",
+                )
+            except BudgetExceededError:
+                if response is None:
+                    raise
+                return response, _mark_partial(checkpoint, "budget_ceiling")
+            try:
+                response = await self._deps.provider.respond(
+                    request.model_copy(update={"tool_results": tool_results})
+                )
+            except Exception:
+                await budget.reconcile(reservation, Decimal(0))
+                raise
+            actual = response.usage.actual_cost_usd or Decimal(0)
+            await budget.reconcile(reservation, actual)
+            if not response.tool_calls:
+                return response, checkpoint
+            added = await self._apply_tool_calls(
+                job, session, registry, response, tool_results, evidence_tokens
+            )
+            if added is None:
+                return response, _mark_partial(checkpoint, "evidence_token_cap")
+            evidence_tokens += added
+            if session.retrievals >= self._deps.limits.max_external_retrievals:
+                return response, _mark_partial(checkpoint, "retrieval_cap")
+        return response, _mark_partial(checkpoint, "iteration_cap")
+
+    async def _apply_tool_calls(
+        self,
+        job: Job,
+        session: ToolSession,
+        registry: ToolRegistry,
+        response: ModelResponse,
+        tool_results: list[ToolResult],
+        evidence_tokens: int,
+    ) -> int | None:
+        added = 0
+        for call in response.tool_calls:
+            self._require_lease(job)
+            result = await registry.invoke(session, call)
+            addition = estimate_tokens("" if result.output is None else str(result.output))
+            if evidence_tokens + added + addition > self._deps.limits.max_evidence_tokens:
+                return None
+            added += addition
+            tool_results.append(result)
+        return added
 
     async def _critique(
         self, checkpoint: ResearchCheckpoint, payload: ResearchPayload
@@ -773,6 +828,7 @@ class ResearchWorkflow:
                     provenance=thesis.provenance,
                 )
             await artifacts.set_current_revision(conn, artifact_id, revision_id)
+            await freeze_thesis(conn, thesis, revision_id)
             await jobs.update_run(
                 conn,
                 run_id=run_id,
@@ -810,17 +866,26 @@ class ResearchWorkflow:
         label = "Demonstration" if thesis.is_demonstration else "Research"
         partial = " partial" if checkpoint.partial_research else ""
         async with self._deps.engine.begin() as conn:
-            await jobs.insert_notification(
-                conn,
-                owner_id=owner_id,
-                kind="new_research",
-                severity="info",
-                title=f"{label}{partial} research: {payload.symbol}",
-                body=thesis.presentation_markdown[:500],
-                run_id=run_id,
-                artifact_id=checkpoint.artifact_id,
-                dedupe_key=f"research:{job.id}:result",
-            )
+            prior = None
+            if checkpoint.revision_id is not None:
+                prior = await automation.previous_structured(
+                    conn,
+                    instrument_id=thesis.instrument_id,
+                    revision_id=checkpoint.revision_id,
+                )
+            kind = decide_alert(cast("dict[str, JsonValue]", thesis.model_dump(mode="json")), prior)
+            if kind is not None:
+                await jobs.insert_notification(
+                    conn,
+                    owner_id=owner_id,
+                    kind=kind,
+                    severity="info",
+                    title=f"{label}{partial} research: {payload.symbol}",
+                    body=thesis.presentation_markdown[:500],
+                    run_id=run_id,
+                    artifact_id=checkpoint.artifact_id,
+                    dedupe_key=f"research:{job.id}:{kind}",
+                )
             await insert_assistant_once(
                 conn,
                 conversation_id=job.conversation_id,
@@ -913,6 +978,19 @@ class ResearchWorkflow:
             known_excerpts,
             calculations_from_rows(rows),
         )
+
+    async def _record_market_data(self, job: Job, checkpoint: ResearchCheckpoint) -> None:
+        """Market-data cost is its own ledger and does not draw down the AI/search ceiling."""
+        if checkpoint.run_id is None:
+            return
+        budget = self._budget(checkpoint, job)
+        reservation = await budget.reserve(
+            category="market_data",
+            provider=self._deps.adapter.capabilities.provider,
+            estimate=Decimal(0),
+            unit_type="records",
+        )
+        await budget.reconcile(reservation, Decimal(0))
 
     def _budget(self, checkpoint: ResearchCheckpoint, job: Job) -> BudgetService:
         return BudgetService(

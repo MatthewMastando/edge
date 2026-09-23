@@ -13,6 +13,7 @@ from trading_api import __version__
 from trading_api.openapi_schema import build_openapi
 from trading_api.routes import (
     artifacts,
+    automation,
     chat,
     health,
     imports,
@@ -87,6 +88,7 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     app.include_router(imports.router)
     app.include_router(trading.router)
     app.include_router(kalshi.router)
+    app.include_router(automation.router)
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema is None:

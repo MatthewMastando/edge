@@ -289,7 +289,7 @@ def _spec(
     )
 
 
-def build_research_registry() -> ToolRegistry:
+def build_research_registry(*, include_web: bool = True) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(
         ToolDefinition(
@@ -355,38 +355,39 @@ def build_research_registry() -> ToolRegistry:
                 handler=_detector(name),
             )
         )
-    registry.register(
-        ToolDefinition(
-            spec=_spec(
-                "search_sources",
-                "Retrieve a labeled fixture source excerpt. Counts against the retrieval cap.",
-                _schema(
-                    {
-                        "query": {"type": "string", "maxLength": 300},
-                        "max_results": {"type": "integer", "minimum": 1, "maximum": 5},
-                    },
-                    ["query"],
+    if include_web:
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "search_sources",
+                    "Retrieve a labeled fixture source excerpt. Counts against the retrieval cap.",
+                    _schema(
+                        {
+                            "query": {"type": "string", "maxLength": 300},
+                            "max_results": {"type": "integer", "minimum": 1, "maximum": 5},
+                        },
+                        ["query"],
+                    ),
+                    external=True,
+                    max_calls=12,
                 ),
-                external=True,
-                max_calls=12,
-            ),
-            permission="research_read",
-            handler=_search,
+                permission="research_read",
+                handler=_search,
+            )
         )
-    )
-    registry.register(
-        ToolDefinition(
-            spec=_spec(
-                "list_catalysts",
-                "List fixture calendar coverage. Live calendars are not configured.",
-                _schema({"symbol": {"type": "string", "maxLength": 32}}, ["symbol"]),
-                external=True,
-                max_calls=4,
-            ),
-            permission="research_read",
-            handler=_catalysts,
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "list_catalysts",
+                    "List fixture calendar coverage. Live calendars are not configured.",
+                    _schema({"symbol": {"type": "string", "maxLength": 32}}, ["symbol"]),
+                    external=True,
+                    max_calls=4,
+                ),
+                permission="research_read",
+                handler=_catalysts,
+            )
         )
-    )
     registry.register(
         ToolDefinition(
             spec=_spec(
