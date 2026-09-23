@@ -7,6 +7,8 @@ import json
 import sys
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -23,6 +25,7 @@ from trading_api.main import create_app
 from trading_api.settings import ApiSettings
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.domain.jobs import Job
+from trading_core.harness.budget import BudgetExceededError, BudgetService
 from trading_core.harness.checkpoints import ResearchCheckpoint
 from trading_core.harness.deps import AfterStage, ResearchPayload, WorkflowDeps
 from trading_core.harness.errors import SuspendWorkflowError
@@ -31,7 +34,7 @@ from trading_core.harness.limits import ResearchLimits
 from trading_core.harness.runner import run_leased_job
 from trading_core.storage.db import Database, fetch_one
 from trading_core.storage.local import LocalParquetStore
-from trading_core.storage.repositories import jobs
+from trading_core.storage.repositories import analytics, jobs
 from trading_core.storage.repositories.common import as_int
 from trading_core.ta import DetectorRegistry
 from trading_worker.main import build_worker
@@ -178,6 +181,34 @@ async def test_skip_locked_leases_distinct_jobs_and_partial_is_leasable(
     assert again is not None and again.state == "running" and again.id == paused.id
 
 
+async def test_extended_lease_is_not_requeued(engine: AsyncEngine) -> None:
+    held = await _enqueue(engine, key=f"hold-{uuid.uuid4()}")
+    dropped = await _enqueue(engine, key=f"drop-{uuid.uuid4()}")
+    async with engine.begin() as conn:
+        assert await jobs.lease_job(conn, job_id=held.id, worker_id="holder", lease_seconds=30)
+        assert await jobs.lease_job(conn, job_id=dropped.id, worker_id="holder", lease_seconds=30)
+    async with engine.begin() as conn:
+        for job_id in (held.id, dropped.id):
+            await fetch_one(
+                conn,
+                """
+                update jobs
+                set lease_until = now() - interval '1 second'
+                where id = :id
+                returning id
+                """,
+                {"id": job_id},
+            )
+        assert await jobs.extend_lease(conn, job_id=held.id, worker_id="holder", lease_seconds=30)
+        expired = await jobs.requeue_expired(conn)
+        kept = await jobs.get_job(conn, held.id)
+        released = await jobs.get_job(conn, dropped.id)
+    assert expired == 1
+    assert kept is not None and kept.state == "running" and kept.leased_by == "holder"
+    assert released is not None and released.state == "queued"
+    assert released.lease_until is None and released.leased_by is None
+
+
 async def test_recorded_workflow_resumes_without_duplicate_artifacts(
     engine: AsyncEngine, generated_dir: Path, tmp_path: Path
 ) -> None:
@@ -257,6 +288,120 @@ async def test_budget_ceiling_stops_the_run(
             {"key": f"budget:{job.id}"},
         )
     assert row is not None and row["kind"] == "budget"
+
+
+async def test_evidence_cap_returns_partial_once(
+    engine: AsyncEngine, generated_dir: Path, tmp_path: Path
+) -> None:
+    job = await _enqueue(engine, key=f"tokens-{uuid.uuid4()}")
+    deps = _deps(
+        engine,
+        generated_dir,
+        tmp_path,
+        worker_id="token-worker",
+        limits=_limits(max_evidence_tokens=1),
+    )
+    async with engine.begin() as conn:
+        leased = await jobs.lease_job(
+            conn, job_id=job.id, worker_id="token-worker", lease_seconds=60
+        )
+    assert leased is not None
+    finished = await run_leased_job(deps, leased)
+    assert finished.state == "completed"
+    assert finished.checkpoint.get("partial_research") is True
+    assert finished.checkpoint.get("stop_reason") == "evidence_token_cap"
+    thesis = finished.checkpoint.get("thesis")
+    assert isinstance(thesis, dict)
+    assert thesis.get("is_demonstration") is True
+    assert thesis.get("provenance") == "recorded"
+    run_id = UUID(str(finished.checkpoint["run_id"]))
+    async with engine.begin() as conn:
+        run = await jobs.get_run(conn, run_id)
+        revisions = await fetch_one(
+            conn,
+            "select count(*) as n from artifact_revisions where run_id = :run_id",
+            {"run_id": run_id},
+        )
+        notes = await jobs.count_notifications(conn, f"research:{job.id}:result")
+        again = await jobs.lease_job(
+            conn, job_id=job.id, worker_id="token-worker", lease_seconds=30
+        )
+    assert run is not None and run.status == "partial"
+    assert revisions is not None and as_int(revisions["n"]) == 1
+    assert notes == 1
+    assert again is None
+
+
+async def test_budget_lock_serializes_reserves(engine: AsyncEngine) -> None:
+    job = await _enqueue(engine, key=f"lock-{uuid.uuid4()}")
+    async with engine.begin() as conn:
+        run = await jobs.insert_run(
+            conn,
+            job_id=job.id,
+            conversation_id=None,
+            provider="recorded",
+            provenance="recorded",
+            model=None,
+            prompt_version="test",
+        )
+    limits = _limits(monthly_ai_search_usd="0.03")
+    budget = BudgetService(engine, limits, run_id=run.id, job_id=job.id)
+    start, _end = analytics.month_bounds(datetime.now(UTC))
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def hold_budget_row() -> None:
+        async with engine.begin() as conn:
+            await analytics.upsert_budget(
+                conn,
+                category="ai_search",
+                period_start=start,
+                limit_usd=Decimal("0.03"),
+            )
+            started.set()
+            await release.wait()
+
+    async def reserve_once() -> str:
+        await started.wait()
+        await asyncio.sleep(0.05)
+        try:
+            await budget.reserve(
+                category="search",
+                provider="fixture",
+                estimate=Decimal("0.02"),
+                unit_type="calls",
+            )
+        except BudgetExceededError:
+            return "stopped"
+        return "reserved"
+
+    holder = asyncio.create_task(hold_budget_row())
+    challenger: asyncio.Task[str] | None = None
+    try:
+        await started.wait()
+        challenger = asyncio.create_task(reserve_once())
+        await asyncio.sleep(0.15)
+        assert not challenger.done()
+        release.set()
+        await holder
+        assert await challenger == "reserved"
+    finally:
+        release.set()
+        if not holder.done():
+            holder.cancel()
+        if challenger is not None and not challenger.done():
+            challenger.cancel()
+    try:
+        await budget.reserve(
+            category="search",
+            provider="fixture",
+            estimate=Decimal("0.02"),
+            unit_type="calls",
+        )
+    except BudgetExceededError:
+        return
+    msg = "second reserve passed the monthly ceiling"
+    raise AssertionError(msg)
 
 
 async def test_chat_streams_progress_and_drafts_do_not_rewrite_revisions(

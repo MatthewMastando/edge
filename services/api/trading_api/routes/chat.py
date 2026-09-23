@@ -17,7 +17,7 @@ from trading_api.runtime import workflow_deps
 from trading_core.domain.common import DomainModel, Timeframe
 from trading_core.harness.deps import ProgressEvent, ResearchPayload
 from trading_core.harness.runner import run_leased_job
-from trading_core.harness.secrets import redact
+from trading_core.harness.secrets import redact, secrets_from_environ
 from trading_core.storage.repositories import conversations, jobs
 
 router = APIRouter(prefix="/v1", tags=["chat"])
@@ -140,7 +140,7 @@ async def post_chat(
                 await queue.put(
                     ProgressEvent(
                         event="error",
-                        message=redact(str(exc), ()),
+                        message=redact(str(exc), secrets_from_environ()),
                         job_id=job.id,
                         conversation_id=conversation_id,
                     )

@@ -47,6 +47,11 @@ class WorkerSettings(BaseSettings):
     def effective_worker_id(self) -> str:
         return self.worker_id or f"{socket.gethostname()}-{id(self) & 0xFFFF:04x}"
 
+    @property
+    def effective_lease_seconds(self) -> int:
+        """Cover a full research timeout so a second worker cannot steal an in-flight job."""
+        return max(self.lease_seconds, int(self.timeout_seconds))
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> WorkerSettings:

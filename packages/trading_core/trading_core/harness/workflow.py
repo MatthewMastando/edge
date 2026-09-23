@@ -6,6 +6,8 @@ bounded tool loop -> critique -> validation -> one repair -> persist -> notify.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import time
 from datetime import UTC, datetime, timedelta
@@ -61,9 +63,48 @@ class ResearchWorkflow:
     def __init__(self, deps: WorkflowDeps) -> None:
         self._deps = deps
         self._deadline = 0.0
+        self._lease_lost = asyncio.Event()
 
     async def execute(self, job: Job) -> None:
         self._deadline = time.monotonic() + self._deps.limits.timeout_seconds
+        self._lease_lost = asyncio.Event()
+        heartbeat = asyncio.create_task(self._hold_lease(job.id))
+        try:
+            await self._run_stages(job)
+        finally:
+            heartbeat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat
+
+    async def _hold_lease(self, job_id: UUID) -> None:
+        """Keep the lease alive while a stage is awaiting I/O.
+
+        A second worker can lease the row once ``lease_until`` passes. Extending it here
+        stops that worker from starting a second run of the same job.
+        """
+        interval = max(1.0, self._deps.lease_seconds / 3)
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                async with self._deps.engine.begin() as conn:
+                    held = await jobs.extend_lease(
+                        conn,
+                        job_id=job_id,
+                        worker_id=self._deps.worker_id,
+                        lease_seconds=self._deps.lease_seconds,
+                    )
+            except Exception:
+                log.warning("lease heartbeat failed for job %s", job_id)
+                continue
+            if not held:
+                self._lease_lost.set()
+                return
+
+    def _require_lease(self, job: Job) -> None:
+        if self._lease_lost.is_set():
+            raise LeaseLostError(str(job.id))
+
+    async def _run_stages(self, job: Job) -> None:
         payload = ResearchPayload.model_validate(job.payload)
         checkpoint = ResearchCheckpoint.model_validate(job.checkpoint)
         checkpoint = await self._ensure_run(job, checkpoint)
@@ -72,6 +113,7 @@ class ResearchWorkflow:
             return
         try:
             for stage in STAGE_ORDER:
+                self._require_lease(job)
                 if stage in checkpoint.stages_completed:
                     continue
                 if self._expired():
@@ -431,7 +473,18 @@ class ResearchWorkflow:
             retrievals=checkpoint.retrievals_used,
             tool_sequence=checkpoint.tool_sequence,
         )
-        packet = await self._packet(checkpoint, payload)
+        packet, truncated = await self._packet(checkpoint, payload)
+        if truncated:
+            checkpoint = checkpoint.model_copy(
+                update={
+                    "partial_research": True,
+                    "stop_reason": checkpoint.stop_reason or "evidence_token_cap",
+                    "warnings": [
+                        *checkpoint.warnings,
+                        "evidence pack truncated at the token cap",
+                    ],
+                }
+            )
         request = ModelRequest(
             instructions=CORE_INSTRUCTIONS,
             messages=[Message(role="user", content=packet)],
@@ -441,7 +494,9 @@ class ResearchWorkflow:
         )
         response = None
         tool_results: list[ToolResult] = []
+        evidence_tokens = estimate_tokens(packet)
         for _iteration in range(self._deps.limits.max_model_iterations):
+            self._require_lease(job)
             if self._expired():
                 await self._pause(job, checkpoint, "timeout")
             reservation = await budget.reserve(
@@ -461,17 +516,24 @@ class ResearchWorkflow:
             await budget.reconcile(reservation, actual)
             if not response.tool_calls:
                 break
+            over_pack = False
             for call in response.tool_calls:
-                tool_results.append(await registry.invoke(session, call))
+                self._require_lease(job)
+                result = await registry.invoke(session, call)
+                addition = estimate_tokens("" if result.output is None else str(result.output))
+                if evidence_tokens + addition > self._deps.limits.max_evidence_tokens:
+                    checkpoint = _mark_partial(checkpoint, "evidence_token_cap")
+                    over_pack = True
+                    break
+                evidence_tokens += addition
+                tool_results.append(result)
+            if over_pack:
+                break
             if session.retrievals >= self._deps.limits.max_external_retrievals:
-                checkpoint = checkpoint.model_copy(
-                    update={"partial_research": True, "stop_reason": "retrieval_cap"}
-                )
+                checkpoint = _mark_partial(checkpoint, "retrieval_cap")
                 break
         else:
-            checkpoint = checkpoint.model_copy(
-                update={"partial_research": True, "stop_reason": "iteration_cap"}
-            )
+            checkpoint = _mark_partial(checkpoint, "iteration_cap")
         raw_json = response.output_json if response is not None else None
         model_json = raw_json if isinstance(raw_json, dict) else {}
         model_text = response.output_text if response is not None else None
@@ -551,6 +613,13 @@ class ResearchWorkflow:
         del job, payload
         if checkpoint.validation_passed or checkpoint.repair_attempted:
             return checkpoint
+        if self._deps.limits.max_repair_attempts < 1:
+            return checkpoint.model_copy(
+                update={
+                    "partial_research": True,
+                    "stop_reason": checkpoint.stop_reason or "validation",
+                }
+            )
         thesis = _thesis(checkpoint)
         async with self._deps.engine.begin() as conn:
             known_features = await market.list_feature_ids(conn, checkpoint.feature_ids)
@@ -709,7 +778,9 @@ class ResearchWorkflow:
             )
         return updated
 
-    async def _packet(self, checkpoint: ResearchCheckpoint, payload: ResearchPayload) -> str:
+    async def _packet(
+        self, checkpoint: ResearchCheckpoint, payload: ResearchPayload
+    ) -> tuple[str, bool]:
         lines = [
             f"Question: {redact(payload.question, self._deps.secrets)}",
             f"Symbol: {payload.symbol}",
@@ -728,6 +799,7 @@ class ResearchWorkflow:
         lines.append("Stub detectors: " + (", ".join(checkpoint.stub_detectors) or "none"))
         lines.append("Source excerpts:")
         used = 0
+        truncated = False
         limit = self._deps.limits.max_evidence_tokens
         async with self._deps.engine.begin() as conn:
             for excerpt_id in checkpoint.excerpt_ids:
@@ -737,13 +809,14 @@ class ResearchWorkflow:
                 tokens = estimate_tokens(text)
                 if used + tokens > limit:
                     lines.append("evidence pack truncated at the token cap")
+                    truncated = True
                     break
                 used += tokens
                 lines.append(f"[{excerpt_id}] {redact(text, self._deps.secrets)}")
         if len(checkpoint.excerpt_ids) == 0:
             lines.append("none")
         lines.append("Do not invent prices, feature ids, or a trading edge.")
-        return "\n".join(lines)
+        return "\n".join(lines), truncated
 
     def _budget(self, checkpoint: ResearchCheckpoint, job: Job) -> BudgetService:
         return BudgetService(
@@ -895,7 +968,7 @@ class ResearchWorkflow:
                     stage="notify",
                     run_id=checkpoint.run_id,
                     job_id=job.id,
-                    job_state=run_status,
+                    job_state="completed",
                     is_demonstration=True if self._deps.provider.name == "recorded" else None,
                     artifact_id=checkpoint.artifact_id,
                 )
@@ -903,6 +976,15 @@ class ResearchWorkflow:
 
     def _expired(self) -> bool:
         return time.monotonic() >= self._deadline
+
+
+def _mark_partial(checkpoint: ResearchCheckpoint, reason: str) -> ResearchCheckpoint:
+    return checkpoint.model_copy(
+        update={
+            "partial_research": True,
+            "stop_reason": checkpoint.stop_reason or reason,
+        }
+    )
 
 
 def _with_stage(checkpoint: ResearchCheckpoint, stage: str) -> ResearchCheckpoint:

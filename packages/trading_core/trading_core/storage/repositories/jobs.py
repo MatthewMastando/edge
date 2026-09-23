@@ -214,6 +214,31 @@ async def lease_next(
     return None if row is None else job_from_row(row)
 
 
+async def extend_lease(
+    conn: AsyncConnection,
+    *,
+    job_id: UUID,
+    worker_id: str,
+    lease_seconds: int,
+) -> bool:
+    """Refresh a live lease without rewriting the checkpoint.
+
+    Only the worker that currently holds a ``running`` job can extend it. A paused or
+    stolen row is left untouched so a ``partial`` job stays leasable.
+    """
+    row = await fetch_one(
+        conn,
+        """
+        update jobs
+        set lease_until = now() + (:lease_seconds * interval '1 second')
+        where id = :id and state = 'running' and leased_by = :worker_id
+        returning id
+        """,
+        {"id": job_id, "worker_id": worker_id, "lease_seconds": lease_seconds},
+    )
+    return row is not None
+
+
 async def save_checkpoint(
     conn: AsyncConnection,
     *,

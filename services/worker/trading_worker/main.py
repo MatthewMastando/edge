@@ -102,7 +102,7 @@ class Worker:
             job = await jobs.lease_next(
                 conn,
                 worker_id=self._settings.effective_worker_id,
-                lease_seconds=self._settings.lease_seconds,
+                lease_seconds=self._settings.effective_lease_seconds,
                 kinds=kinds,
             )
         if job is None:
@@ -173,7 +173,7 @@ def build_worker(settings: WorkerSettings) -> Worker:
         detectors=DetectorRegistry(),
         limits=_limits(settings),
         worker_id=settings.effective_worker_id,
-        lease_seconds=settings.lease_seconds,
+        lease_seconds=settings.effective_lease_seconds,
         model=settings.llm_model or None,
         secrets=secrets_from_environ(),
     )

@@ -52,7 +52,16 @@ class BudgetService:
         limit = Decimal(0) if category == "market_data" else self._limits.monthly_ai_search_usd
         now = datetime.now(UTC)
         start, end = analytics.month_bounds(now)
+        budget_category = "market_data" if category == "market_data" else "ai_search"
         async with self._engine.begin() as conn:
+            # Lock the monthly budget row before reading spend so two runs cannot both
+            # pass the ceiling check and reserve past the limit.
+            await analytics.upsert_budget(
+                conn,
+                category=budget_category,
+                period_start=start,
+                limit_usd=limit,
+            )
             if category != "market_data":
                 spent = await analytics.month_spend(
                     conn, start=start, end=end, categories=AI_CATEGORIES
@@ -63,12 +72,6 @@ class BudgetService:
                         f"(committed {spent}, reserve {estimate})"
                     )
                     raise BudgetExceededError(msg)
-            await analytics.upsert_budget(
-                conn,
-                category="ai_search" if category != "market_data" else "market_data",
-                period_start=start,
-                limit_usd=limit,
-            )
             ledger_id = await analytics.insert_usage(
                 conn,
                 run_id=self._run_id,

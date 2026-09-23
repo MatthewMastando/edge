@@ -176,6 +176,7 @@ class ToolRegistry:
     ) -> None:
         sequence = session.tool_sequence
         session.tool_sequence += 1
+        safe_arguments = _json_object(redact_json(call.arguments, session.deps.secrets))
         async with session.deps.engine.begin() as conn:
             await insert_tool_call(
                 conn,
@@ -183,7 +184,7 @@ class ToolRegistry:
                 sequence=sequence,
                 tool_name=call.name,
                 tool_version=version,
-                arguments=call.arguments,
+                arguments=safe_arguments,
                 output=output,
                 is_error=is_error,
                 counts_as_external_retrieval=external,
@@ -215,7 +216,7 @@ def enforce_arguments(spec: ToolSpec, arguments: dict[str, JsonValue]) -> None:
     if isinstance(required, list):
         for name in required:
             if isinstance(name, str) and name not in arguments:
-                msg = f"missing argument {key}"
+                msg = f"missing argument {name}"
                 raise ArgumentLimitError(msg)
     for key, value in arguments.items():
         rule = rules.get(key)
@@ -636,6 +637,12 @@ def _public_row(row: dict[str, object]) -> dict[str, JsonValue]:
         else:
             published[key] = str(value)
     return published
+
+
+def _json_object(value: JsonValue) -> dict[str, JsonValue]:
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 def redact_json(value: JsonValue, secrets: tuple[str, ...]) -> JsonValue:

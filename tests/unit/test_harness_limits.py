@@ -16,6 +16,7 @@ from trading_core.harness.tools import (
     ArgumentLimitError,
     build_research_registry,
     enforce_arguments,
+    redact_json,
 )
 from trading_core.harness.validation import repair_thesis, validate_thesis
 
@@ -46,6 +47,10 @@ def test_argument_limits_are_enforced() -> None:
         enforce_arguments(bars, {"symbol": "6EZ6", "extra": "no"})
     with pytest.raises(ArgumentLimitError):
         enforce_arguments(bars, {"symbol": "x" * 4000})
+    with pytest.raises(ArgumentLimitError, match="symbol"):
+        enforce_arguments(bars, {})
+    with pytest.raises(ArgumentLimitError, match="symbol"):
+        enforce_arguments(bars, {"limit": 5})
 
 
 def test_one_repair_drops_unmatched_prices_and_unknown_evidence() -> None:
@@ -124,6 +129,14 @@ def test_one_repair_drops_unmatched_prices_and_unknown_evidence() -> None:
     assert [item.feature_id for item in repaired.technical_findings] == [feature_id]
     assert repaired.supporting_evidence == []
     assert repaired.is_demonstration is True
+
+
+def test_tool_arguments_redact_secrets() -> None:
+    secret = "super-secret-token"
+    redacted = redact_json({"query": f"look up {secret}", "nested": {"note": secret}}, (secret,))
+    assert secret not in str(redacted)
+    assert isinstance(redacted, dict)
+    assert redacted["query"] == "look up [redacted]"
 
 
 def test_secrets_are_redacted() -> None:
