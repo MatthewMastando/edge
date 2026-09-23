@@ -184,6 +184,74 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/v1/import/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Csv Import */
+        post: operations["commitCsvImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/import/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Presets */
+        get: operations["listImportPresets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/import/presets/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Preset */
+        put: operations["saveImportPreset"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Import */
+        post: operations["previewCsvImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/instruments": {
         parameters: {
             query?: never;
@@ -193,6 +261,40 @@ export type paths = {
         };
         /** List Instruments */
         get: operations["listInstruments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kalshi/markets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Markets */
+        get: operations["listKalshiMarkets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kalshi/markets/{ticker}/brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Brief */
+        get: operations["getKalshiEventBrief"];
         put?: never;
         post?: never;
         delete?: never;
@@ -317,6 +419,40 @@ export type paths = {
         };
         /** List Snapshots */
         get: operations["listSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/fills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Fills */
+        get: operations["listImportedFills"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/trading/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Summary */
+        get: operations["getTradingSummary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -637,6 +773,28 @@ export type components = {
              */
             window_bars: number | null;
         };
+        /**
+         * CsvColumnMapping
+         * @description Maps logical fill fields to CSV header names. Unmapped optional fields use defaults.
+         */
+        CsvColumnMapping: {
+            /** Columns */
+            columns: {
+                [key: string]: string;
+            };
+            /**
+             * Default Currency
+             * @default USD
+             */
+            default_currency: string;
+            /**
+             * Default Fill Tz
+             * @default America/New_York
+             */
+            default_fill_tz: string;
+            /** Preset Name */
+            preset_name?: string | null;
+        };
         /** DraftBody */
         DraftBody: {
             /** Base Revision Id */
@@ -915,6 +1073,237 @@ export type components = {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** ImportCommitRequest */
+        ImportCommitRequest: {
+            /** Csv Text */
+            csv_text: string;
+            /** Filename */
+            filename: string;
+            mapping: components["schemas"]["CsvColumnMapping"];
+        };
+        /** ImportCommitResult */
+        ImportCommitResult: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Duplicate Count */
+            duplicate_count: number;
+            /** Error Count */
+            error_count: number;
+            /** Imported Count */
+            imported_count: number;
+            /**
+             * Incomplete Stored
+             * @default 0
+             */
+            incomplete_stored: number;
+            /**
+             * Settlement Stored
+             * @default 0
+             */
+            settlement_stored: number;
+            /** Skipped Incomplete */
+            skipped_incomplete: number;
+        };
+        /** ImportedFillView */
+        ImportedFillView: {
+            /** Asset Class */
+            asset_class?: string | null;
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Contract Code */
+            contract_code?: string | null;
+            /** Currency */
+            currency: string;
+            /**
+             * Fees
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            fees: string;
+            /**
+             * Fill Time
+             * Format: date-time
+             */
+            fill_time: string;
+            /** Fill Tz */
+            fill_tz: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instrument Id */
+            instrument_id?: string | null;
+            /** Instrument Symbol */
+            instrument_symbol?: string | null;
+            /** Is Complete */
+            is_complete: boolean;
+            /** Multiplier */
+            multiplier?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Price
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            price: string;
+            /**
+             * Quantity
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            quantity: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Source Row Hash */
+            source_row_hash: string;
+            /** Source Row Number */
+            source_row_number: number;
+            /** Source Row Raw */
+            source_row_raw?: {
+                [key: string]: string;
+            } | null;
+            /** Symbol Raw */
+            symbol_raw: string;
+            /** Venue */
+            venue?: string | null;
+        };
+        /** ImportPreset */
+        ImportPreset: {
+            mapping: components["schemas"]["CsvColumnMapping"];
+            /** Name */
+            name: string;
+        };
+        /** ImportPreview */
+        ImportPreview: {
+            /** Complete Count */
+            complete_count: number;
+            /** Duplicate Count */
+            duplicate_count: number;
+            /** Error Count */
+            error_count: number;
+            /** Filename */
+            filename: string;
+            /**
+             * Importable Count
+             * @default 0
+             */
+            importable_count: number;
+            /** Incomplete Count */
+            incomplete_count: number;
+            mapping: components["schemas"]["CsvColumnMapping"];
+            /** Row Count */
+            row_count: number;
+            /** Rows */
+            rows: components["schemas"]["ImportPreviewRow"][];
+            /**
+             * Settlement Count
+             * @default 0
+             */
+            settlement_count: number;
+            /**
+             * Trusted Row Count
+             * @description Complete fills that would be imported and count toward trusted P&L totals. Settlement cash and incomplete rows are not included.
+             */
+            trusted_row_count: number;
+        };
+        /** ImportPreviewRequest */
+        ImportPreviewRequest: {
+            /** Csv Text */
+            csv_text: string;
+            /** Filename */
+            filename: string;
+            mapping: components["schemas"]["CsvColumnMapping"];
+        };
+        /** ImportPreviewRow */
+        ImportPreviewRow: {
+            /** Asset Class */
+            asset_class?: string | null;
+            /** Cash Amount */
+            cash_amount?: string | null;
+            /** Contract Code */
+            contract_code?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Fees */
+            fees?: string | null;
+            /** Fill Time */
+            fill_time?: string | null;
+            /** Fill Tz */
+            fill_tz?: string | null;
+            /** Instrument Id */
+            instrument_id?: string | null;
+            /** Instrument Symbol */
+            instrument_symbol?: string | null;
+            /**
+             * Is Complete
+             * @default false
+             */
+            is_complete: boolean;
+            /**
+             * Is Duplicate
+             * @default false
+             */
+            is_duplicate: boolean;
+            /**
+             * Issues
+             * @default []
+             */
+            issues: components["schemas"]["ImportRowIssue"][];
+            /** Multiplier */
+            multiplier?: string | null;
+            /** Price */
+            price?: string | null;
+            /** Quantity */
+            quantity?: string | null;
+            /**
+             * Row Kind
+             * @default fill
+             * @enum {string}
+             */
+            row_kind: "fill" | "settlement";
+            /** Side */
+            side?: ("buy" | "sell") | null;
+            /** Source Row Hash */
+            source_row_hash: string;
+            /** Source Row Number */
+            source_row_number: number;
+            /** Symbol Raw */
+            symbol_raw: string;
+            /** Venue */
+            venue?: string | null;
+            /**
+             * Will Import
+             * @default false
+             */
+            will_import: boolean;
+        };
+        /** ImportRowIssue */
+        ImportRowIssue: {
+            /** Code */
+            code: string;
+            /** Field */
+            field?: ("symbol" | "side" | "quantity" | "price" | "fees" | "fill_time" | "currency" | "contract_code" | "venue" | "fill_tz" | "activity" | "cash_amount") | null;
+            /** Message */
+            message: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+            /** Source Row Number */
+            source_row_number: number;
+        };
         /**
          * Instrument
          * @description A tradable or researchable symbol. Futures roots and continuous series are instruments;
@@ -1107,6 +1496,78 @@ export type components = {
             updated_at: string;
         };
         JsonValue: unknown;
+        /** KalshiEventBrief */
+        KalshiEventBrief: {
+            /** Event Summary */
+            event_summary: string;
+            /** Fee Notes */
+            fee_notes: string;
+            /**
+             * Is Demonstration
+             * @description True when served from fixtures or when live Kalshi is unavailable.
+             * @default false
+             */
+            is_demonstration: boolean;
+            /** No Scenario */
+            no_scenario: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "fixture" | "recorded" | "live";
+            /** Settlement Rules */
+            settlement_rules: string;
+            /** Sources */
+            sources: components["schemas"]["KalshiSourceRef"][];
+            /** Ticker */
+            ticker: string;
+            /** Title */
+            title: string;
+            /** Yes Scenario */
+            yes_scenario: string;
+        };
+        /** KalshiMarket */
+        KalshiMarket: {
+            /** Category */
+            category: string;
+            /** Close Time */
+            close_time?: string | null;
+            /** Last Price */
+            last_price?: string | null;
+            /** No Ask */
+            no_ask?: string | null;
+            /** No Bid */
+            no_bid?: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "fixture" | "recorded" | "live";
+            /** Status */
+            status: string;
+            /** Ticker */
+            ticker: string;
+            /** Title */
+            title: string;
+            /** Volume */
+            volume?: number | null;
+            /** Yes Ask */
+            yes_ask?: string | null;
+            /** Yes Bid */
+            yes_bid?: string | null;
+        };
+        /** KalshiSourceRef */
+        KalshiSourceRef: {
+            /** Label */
+            label: string;
+            /**
+             * Retrieved At
+             * Format: date-time
+             */
+            retrieved_at: string;
+            /** Url */
+            url: string;
+        };
         /**
          * Level
          * @description A named price produced by a detector (POC, VAH, zone bounds, swept level ...).
@@ -1313,6 +1774,49 @@ export type components = {
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCall"][];
             usage: components["schemas"]["Usage"];
+        };
+        /** PresetList */
+        PresetList: {
+            /** Presets */
+            presets: components["schemas"]["ImportPreset"][];
+        };
+        /** RealizedPnLLine */
+        RealizedPnLLine: {
+            /** Asset Class */
+            asset_class?: string | null;
+            /** Contract Code */
+            contract_code?: string | null;
+            /** Currency */
+            currency: string;
+            /**
+             * Fees
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            fees: string;
+            /** Fill Count */
+            fill_count: number;
+            /**
+             * Incomplete Fill Count
+             * @default 0
+             */
+            incomplete_fill_count: number;
+            /** Instrument Id */
+            instrument_id: string | null;
+            /**
+             * Net Pnl
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            net_pnl: string;
+            /**
+             * Realized Pnl
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            realized_pnl: string;
+            /** Symbol */
+            symbol: string;
         };
         /** RevisionDetail */
         RevisionDetail: {
@@ -1554,6 +2058,10 @@ export type components = {
             sequence: number;
             /** Stage */
             stage?: ("resolve_instrument" | "capture_snapshot" | "deterministic_ta" | "gather_context" | "synthesize" | "critique" | "validate" | "repair" | "persist" | "notify") | null;
+        };
+        /** SavePresetRequest */
+        SavePresetRequest: {
+            preset: components["schemas"]["ImportPreset"];
         };
         /** SearchResponse */
         SearchResponse: {
@@ -2198,6 +2706,64 @@ export type components = {
              */
             unset_reason: string | null;
         };
+        /**
+         * TradingSummary
+         * @description Realized P&L from imported fills. No portfolio return without balances and cash flows.
+         */
+        TradingSummary: {
+            /**
+             * Has Account Snapshots
+             * @default false
+             */
+            has_account_snapshots: boolean;
+            /** Incomplete Fill Count */
+            incomplete_fill_count: number;
+            /** Lines */
+            lines: components["schemas"]["RealizedPnLLine"][];
+            /**
+             * Portfolio Return Available
+             * @description True only when account balances and external cash flows both exist. Fill P&L alone is not a portfolio return.
+             * @default false
+             */
+            portfolio_return_available: boolean;
+            /**
+             * Settlement Cash Excluded
+             * Format: decimal
+             * @description Signed settlement cash stored for this view and left out of FIFO realized P&L so variation margin is not double-counted against closing fills.
+             * @default 0
+             */
+            settlement_cash_excluded: string;
+            /**
+             * Settlement Flow Count
+             * @default 0
+             */
+            settlement_flow_count: number;
+            /**
+             * Summary Currency
+             * @description Currency of the headline totals. Null when there are no trusted fills or when fills span more than one currency. Mixed-currency headline totals are withheld.
+             */
+            summary_currency?: string | null;
+            /**
+             * Total Fees
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            total_fees: string;
+            /**
+             * Total Net Pnl
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            total_net_pnl: string;
+            /**
+             * Total Realized Pnl
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            total_realized_pnl: string;
+            /** Trusted Fill Count */
+            trusted_fill_count: number;
+        };
         /** Usage */
         Usage: {
             /** Actual Cost Usd */
@@ -2673,6 +3239,127 @@ export interface operations {
             };
         };
     };
+    commitCsvImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportCommitResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listImportPresets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetList"];
+                };
+            };
+        };
+    };
+    saveImportPreset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePresetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreset"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previewCsvImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listInstruments: {
         parameters: {
             query?: never;
@@ -2689,6 +3376,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Instrument"][];
+                };
+            };
+        };
+    };
+    listKalshiMarkets: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KalshiMarket"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getKalshiEventBrief: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KalshiEventBrief"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2888,6 +3637,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketSnapshot"][];
+                };
+            };
+        };
+    };
+    listImportedFills: {
+        parameters: {
+            query?: {
+                asset_class?: string | null;
+                instrument_id?: string | null;
+                limit?: number;
+                symbol?: string | null;
+                trusted_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportedFillView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getTradingSummary: {
+        parameters: {
+            query?: {
+                asset_class?: string | null;
+                instrument_id?: string | null;
+                symbol?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

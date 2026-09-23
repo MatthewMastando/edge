@@ -7,8 +7,14 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from trading_core.storage.db import fetch_one
-from trading_core.storage.repositories.common import as_decimal, as_json_dict, as_uuid, json_param
+from trading_core.storage.db import fetch_all, fetch_one
+from trading_core.storage.repositories.common import (
+    as_decimal,
+    as_json_dict,
+    as_str,
+    as_uuid,
+    json_param,
+)
 
 if TYPE_CHECKING:
     from pydantic import JsonValue
@@ -257,16 +263,23 @@ async def insert_fill(
     instrument_id: UUID | None = None,
     contract_code: str | None = None,
     fees: Decimal = Decimal(0),
-) -> UUID:
+    venue: str | None = None,
+    multiplier: Decimal | None = None,
+    is_complete: bool = True,
+    source_row_raw: dict[str, str] | None = None,
+) -> UUID | None:
+    """Insert a fill. Return None when this source row was already stored."""
     row = await fetch_one(
         conn,
         """
         insert into imported_fills (
           batch_id, source_row_number, source_row_hash, instrument_id, symbol_raw, contract_code,
-          side, quantity, price, fees, currency, fill_time, fill_tz
+          side, quantity, price, fees, currency, fill_time, fill_tz, venue, multiplier,
+          is_complete, source_row_raw
         ) values (
           :batch_id, :source_row_number, :source_row_hash, :instrument_id, :symbol_raw,
-          :contract_code, :side, :quantity, :price, :fees, :currency, :fill_time, :fill_tz
+          :contract_code, :side, :quantity, :price, :fees, :currency, :fill_time, :fill_tz,
+          :venue, :multiplier, :is_complete, cast(:source_row_raw as jsonb)
         )
         on conflict (source_row_hash) do nothing
         returning id
@@ -285,19 +298,116 @@ async def insert_fill(
             "currency": currency,
             "fill_time": fill_time,
             "fill_tz": fill_tz,
+            "venue": venue,
+            "multiplier": multiplier,
+            "is_complete": is_complete,
+            "source_row_raw": json_param(source_row_raw or {}),
         },
     )
     if row is None:
-        existing = await fetch_one(
-            conn,
-            "select id from imported_fills where source_row_hash = :source_row_hash",
-            {"source_row_hash": source_row_hash},
-        )
-        if existing is None:
-            msg = "fill insert conflicted without a row"
-            raise RuntimeError(msg)
-        return as_uuid(existing["id"])
+        return None
     return as_uuid(row["id"])
+
+
+async def insert_cash_flow(
+    conn: AsyncConnection,
+    *,
+    batch_id: UUID,
+    source_row_number: int,
+    source_row_hash: str,
+    symbol_raw: str,
+    currency: str,
+    amount: Decimal,
+    flow_time: datetime,
+    flow_tz: str,
+    instrument_id: UUID | None = None,
+    contract_code: str | None = None,
+    source_row_raw: dict[str, str] | None = None,
+) -> UUID | None:
+    """Insert settlement cash. Return None when this source row was already stored."""
+    row = await fetch_one(
+        conn,
+        """
+        insert into imported_cash_flows (
+          batch_id, source_row_number, source_row_hash, instrument_id, symbol_raw, contract_code,
+          currency, amount, flow_time, flow_tz, flow_kind, source_row_raw
+        ) values (
+          :batch_id, :source_row_number, :source_row_hash, :instrument_id, :symbol_raw,
+          :contract_code, :currency, :amount, :flow_time, :flow_tz, 'settlement',
+          cast(:source_row_raw as jsonb)
+        )
+        on conflict (source_row_hash) do nothing
+        returning id
+        """,
+        {
+            "batch_id": batch_id,
+            "source_row_number": source_row_number,
+            "source_row_hash": source_row_hash,
+            "instrument_id": instrument_id,
+            "symbol_raw": symbol_raw,
+            "contract_code": contract_code,
+            "currency": currency,
+            "amount": amount,
+            "flow_time": flow_time,
+            "flow_tz": flow_tz,
+            "source_row_raw": json_param(source_row_raw or {}),
+        },
+    )
+    if row is None:
+        return None
+    return as_uuid(row["id"])
+
+
+async def finalize_import_batch(
+    conn: AsyncConnection,
+    *,
+    batch_id: UUID,
+    row_count: int,
+    imported_count: int,
+    duplicate_count: int,
+    error_count: int,
+    status: str,
+) -> None:
+    await fetch_one(
+        conn,
+        """
+        update import_batches
+        set row_count = :row_count,
+            imported_count = :imported_count,
+            duplicate_count = :duplicate_count,
+            error_count = :error_count,
+            status = :status
+        where id = :batch_id
+        returning id
+        """,
+        {
+            "batch_id": batch_id,
+            "row_count": row_count,
+            "imported_count": imported_count,
+            "duplicate_count": duplicate_count,
+            "error_count": error_count,
+            "status": status,
+        },
+    )
+
+
+async def existing_fill_hashes(conn: AsyncConnection, owner_id: UUID) -> set[str]:
+    rows = await fetch_all(
+        conn,
+        """
+        select f.source_row_hash
+        from imported_fills f
+        join import_batches b on b.id = f.batch_id
+        where b.owner_id = :owner_id
+        union
+        select c.source_row_hash
+        from imported_cash_flows c
+        join import_batches b on b.id = c.batch_id
+        where b.owner_id = :owner_id
+        """,
+        {"owner_id": owner_id},
+    )
+    return {as_str(row["source_row_hash"]) for row in rows}
 
 
 async def insert_account_snapshot(

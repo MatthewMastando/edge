@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { useCapabilities, useHealth, useSnapshots } from "../api/queries";
-import { Modal } from "../components/Modal";
+import { useCapabilities, useHealth, useKalshiBrief, useKalshiMarkets, useSnapshots } from "../api/queries";
+import { CsvImportWizard } from "../integrations/CsvImportWizard";
 import { formatDecimal } from "../lib/provenance";
 import { formatInstant } from "../lib/format";
 import { useWorkspace } from "../workspace/useWorkspace";
@@ -15,6 +16,7 @@ const SOURCES = [
   { name: "SEC EDGAR", access: "Filings. Needs a User-Agent.", state: "Not configured" },
   { name: "EIA", access: "Energy inventories", state: "Not configured" },
   { name: "Web search", access: "Bounded retrieval", state: "Not configured" },
+  { name: "Kalshi", access: "Read-only event markets and briefs", state: "Fixture" },
 ];
 
 export function IntegrationsPage() {
@@ -23,6 +25,10 @@ export function IntegrationsPage() {
   const snapshots = useSnapshots();
   const { state } = useWorkspace();
   const [importOpen, setImportOpen] = useState(false);
+  const [kalshiTicker, setKalshiTicker] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const kalshiMarkets = useKalshiMarkets();
+  const kalshiBrief = useKalshiBrief(kalshiTicker);
   const latest = snapshots.data?.[0];
   const usage = state.runs.reduce(
     (sum, run) => ({
@@ -141,7 +147,9 @@ export function IntegrationsPage() {
 
       <section aria-labelledby="csv">
         <h3 id="csv">CSV import</h3>
-        <p className="hint">Mapping presets, validation, and duplicate detection land with the analytics work. This entry point only previews a local file.</p>
+        <p className="hint">
+          Mapping-driven import with preview, validation, duplicate detection, and saved presets. Reimports skip rows already stored by source hash.
+        </p>
         <button
           type="button"
           className="primary"
@@ -152,56 +160,67 @@ export function IntegrationsPage() {
           Import CSV
         </button>
       </section>
+
+      <section aria-labelledby="kalshi">
+        <h3 id="kalshi">Kalshi (read-only)</h3>
+        <p className="hint">
+          Event contracts, settlement rules, and YES/NO scenarios with sources. No order entry and no stock-style TA on contract prices.
+        </p>
+        {kalshiMarkets.isError ? <p role="alert">Kalshi markets could not be loaded.</p> : null}
+        <ul className="artifact-list">
+          {(kalshiMarkets.data ?? []).map((market) => (
+            <li key={market.ticker}>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  setKalshiTicker(market.ticker);
+                }}
+              >
+                <strong>{market.ticker}</strong> — {market.title}
+              </button>
+              <p className="hint">
+                {market.status} · last {market.last_price ?? "n/a"} · {market.provenance}
+              </p>
+            </li>
+          ))}
+        </ul>
+        {kalshiBrief.data ? (
+          <article className="kalshi-brief">
+            {kalshiBrief.data.is_demonstration ? <div className="banner banner-inline">Demonstration Kalshi data</div> : null}
+            <h4>{kalshiBrief.data.title}</h4>
+            <p>{kalshiBrief.data.event_summary}</p>
+            <h5>Settlement</h5>
+            <p>{kalshiBrief.data.settlement_rules}</p>
+            <h5>YES</h5>
+            <p>{kalshiBrief.data.yes_scenario}</p>
+            <h5>NO</h5>
+            <p>{kalshiBrief.data.no_scenario}</p>
+            <h5>Fees</h5>
+            <p>{kalshiBrief.data.fee_notes}</p>
+            <h5>Sources</h5>
+            <ul>
+              {kalshiBrief.data.sources.map((source) => (
+                <li key={source.url}>
+                  <a href={source.url} rel="noreferrer" target="_blank">{source.label}</a>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ) : null}
+      </section>
+
       {importOpen ? (
-        <CsvPreview
+        <CsvImportWizard
           onClose={() => {
             setImportOpen(false);
+          }}
+          onImported={() => {
+            void queryClient.invalidateQueries({ queryKey: ["trading-fills"] });
+            void queryClient.invalidateQueries({ queryKey: ["trading-summary"] });
           }}
         />
       ) : null}
     </div>
-  );
-}
-
-function CsvPreview({ onClose }: { onClose: () => void }) {
-  const [name, setName] = useState<string | null>(null);
-  const [header, setHeader] = useState<string | null>(null);
-  const [rows, setRows] = useState<number | null>(null);
-
-  return (
-    <Modal title="CSV import" onClose={onClose}>
-      <p className="hint">Nothing is uploaded and no fills are written. Drop a file to see its name, header, and row count.</p>
-      <input
-        aria-label="CSV file"
-        type="file"
-        accept=".csv,text/csv"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          setName(file.name);
-          void file.text().then((text) => {
-            const lines = text.split(/\r?\n/).filter((line) => line.length > 0);
-            setHeader(lines[0] ?? "(empty file)");
-            setRows(Math.max(0, lines.length - 1));
-          });
-        }}
-      />
-      {name ? (
-        <dl className="meta-grid">
-          <div>
-            <dt>File</dt>
-            <dd>{name}</dd>
-          </div>
-          <div>
-            <dt>Header</dt>
-            <dd>{header}</dd>
-          </div>
-          <div>
-            <dt>Data rows</dt>
-            <dd className="num">{rows ?? "…"}</dd>
-          </div>
-        </dl>
-      ) : null}
-    </Modal>
   );
 }

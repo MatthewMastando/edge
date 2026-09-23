@@ -11,7 +11,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from trading_api import __version__
 from trading_api.openapi_schema import build_openapi
-from trading_api.routes import artifacts, chat, health, market, runs, search
+from trading_api.routes import (
+    artifacts,
+    chat,
+    health,
+    imports,
+    kalshi,
+    market,
+    runs,
+    search,
+    trading,
+)
 from trading_api.settings import ApiSettings, get_settings
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.storage.db import Database
@@ -74,6 +84,9 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     app.include_router(runs.router)
     app.include_router(artifacts.router)
     app.include_router(search.router)
+    app.include_router(imports.router)
+    app.include_router(trading.router)
+    app.include_router(kalshi.router)
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema is None:
