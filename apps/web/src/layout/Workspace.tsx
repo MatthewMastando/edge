@@ -20,7 +20,7 @@ export function ResearchWorkspace() {
       className="workspace"
       data-mode={state.mode}
       data-testid="workspace"
-      style={mainPx === null ? undefined : { gridTemplateColumns: `${String(mainPx)}px 6px minmax(280px, 1fr)` }}
+      style={mainPx === null ? undefined : { gridTemplateColumns: `${String(mainPx)}px 16px minmax(320px, 1fr)` }}
     >
       <div
         ref={reportRef}

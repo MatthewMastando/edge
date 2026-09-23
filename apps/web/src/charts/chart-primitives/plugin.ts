@@ -71,8 +71,8 @@ class PaneView implements IPrimitivePaneView {
 export class PriceTag implements ISeriesPrimitiveAxisView {
   coordinateValue = -1_000_000;
   label = "";
-  color = "#d7b07a";
-  ink = "#241c12";
+  color = "#d4b483";
+  ink = "#1c160e";
   coordinate(): number {
     return this.coordinateValue;
   }

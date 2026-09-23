@@ -35,7 +35,7 @@ export function attachRsiSubpane(
     1,
   );
   series.setData(data);
-  series.getPane().setHeight(112);
+  series.getPane().setHeight(148);
   const guides = new RsiGuidePrimitive(colors);
   series.attachPrimitive(guides);
   const markerPrimitive = marker ? new MarkerPrimitive(marker, colors) : null;

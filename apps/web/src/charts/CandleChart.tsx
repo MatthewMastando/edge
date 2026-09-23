@@ -54,11 +54,11 @@ export function CandleChart({
     const colors = chartPalette(host);
     const chart: IChartApi = createChart(host, {
       autoSize: true,
-      height: 460,
+      height: 640,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textDim,
-        fontFamily: "Segoe UI, Helvetica Neue, system-ui, sans-serif",
+        fontFamily: getComputedStyle(host).fontFamily,
       },
       grid: {
         vertLines: { color: colors.grid },
@@ -156,6 +156,7 @@ export function CandleChart({
                 onSelect(annotation.id);
               }}
             >
+              <span className={`swatch swatch-${annotation.direction}`} aria-hidden="true" />
               {annotation.label}
             </button>
           </div>

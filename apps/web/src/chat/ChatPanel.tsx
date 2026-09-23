@@ -7,14 +7,26 @@ export function ChatPanel() {
   const { state, dispatch } = useWorkspace();
   const conversation = state.conversations.find((item) => item.id === state.activeConversationId) ?? null;
   const scroller = useRef<HTMLDivElement>(null);
+  const seen = useRef({ id: conversation?.id ?? "", count: conversation?.messages.length ?? 0 });
   const [text, setText] = useState("");
   const top = state.scroll.chat;
+  const messageCount = conversation?.messages.length ?? 0;
 
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (!element) return;
+    if (!conversation || !element) return;
+    const sameConversation = seen.current.id === conversation.id;
+    const appended = sameConversation && messageCount > seen.current.count;
+    seen.current = { id: conversation.id, count: messageCount };
+    if (appended) {
+      element.scrollTop = element.scrollHeight;
+      if (element.scrollTop !== top) {
+        dispatch({ type: "scroll", slot: "chat", top: element.scrollTop });
+      }
+      return;
+    }
     if (element.scrollTop !== top) element.scrollTop = top;
-  }, [state.mode, top]);
+  }, [conversation, dispatch, messageCount, state.mode, top]);
 
   if (!conversation) return <p className="hint">No conversation.</p>;
 

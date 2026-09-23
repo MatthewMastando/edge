@@ -68,7 +68,9 @@ export function IntegrationsPage() {
               <tr key={source.name}>
                 <td>{source.name}</td>
                 <td>{source.access}</td>
-                <td>{source.state}</td>
+                <td>
+                  <span className={source.state === "Connected" ? "status-ok" : "status-idle"}>{source.state}</span>
+                </td>
               </tr>
             ))}
           </tbody>
