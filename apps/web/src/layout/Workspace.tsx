@@ -20,7 +20,7 @@ export function ResearchWorkspace() {
       className="workspace"
       data-mode={state.mode}
       data-testid="workspace"
-      style={mainPx === null ? undefined : { gridTemplateColumns: `${String(mainPx)}px 64px minmax(400px, 1fr)` }}
+      style={mainPx === null ? undefined : { gridTemplateColumns: `${String(mainPx)}px 16px minmax(280px, 1fr)` }}
     >
       <div
         ref={reportRef}
@@ -44,7 +44,7 @@ export function ResearchWorkspace() {
           if (!workspace) return;
           const rect = workspace.getBoundingClientRect();
           const move = (pointer: PointerEvent) => {
-            const next = Math.min(Math.max(pointer.clientX - rect.left, 440), rect.width - 460);
+            const next = Math.min(Math.max(pointer.clientX - rect.left, 360), rect.width - 300);
             setMainPx(next);
           };
           const stop = () => {

@@ -176,7 +176,7 @@ export function ChatPanel() {
         <textarea
           id="chat-input"
           value={text}
-          rows={3}
+          rows={2}
           placeholder="Ask about the open research. Nothing here can place an order."
           onChange={(event) => {
             setText(event.target.value);

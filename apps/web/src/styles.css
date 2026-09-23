@@ -23,12 +23,12 @@
   --font: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
   --serif: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --rail: 248px;
-  --top: 64px;
-  --gutter: 64px;
+  --rail: 216px;
+  --top: 52px;
+  --gutter: 16px;
   font-family: var(--font);
-  font-size: 17px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.45;
   color: var(--text);
   background: var(--bg);
 }
@@ -116,9 +116,9 @@ a { color: inherit; }
 .rail {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.15rem;
   min-height: 0;
-  padding: 1.75rem 1.2rem 1.5rem;
+  padding: 1rem 0.55rem 0.85rem;
   background: var(--bg-sunken);
   border-right: 1px solid var(--line);
 }
@@ -201,9 +201,15 @@ a { color: inherit; }
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 1.1rem 0.45rem 0.2rem;
+  gap: 0.2rem;
+  padding: 0.75rem 0.2rem 0.15rem;
   border-top: 1px solid var(--line);
+}
+
+.rail-footer .hint {
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .rail-footer p, .rail-user { margin: 0; }
@@ -270,10 +276,10 @@ a { color: inherit; }
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) var(--gutter) minmax(420px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) var(--gutter) minmax(300px, 380px);
   height: 100%;
   min-height: 0;
-  padding: 1.75rem 2rem 1.75rem 2.5rem;
+  padding: 0.85rem 1rem;
   box-sizing: border-box;
 }
 
@@ -321,10 +327,12 @@ a { color: inherit; }
   background: var(--demo-bg);
   color: var(--demo-fg);
   border: 1px solid var(--demo-line);
-  border-radius: 10px;
-  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.65rem;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.01em;
+  line-height: 1.35;
 }
 
 .banner-inline {
@@ -338,9 +346,9 @@ a { color: inherit; }
 
 .num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 0.92em; }
 
-.thesis, .page { padding: 2.75rem 3.25rem 4.5rem; }
+.thesis, .page { padding: 1.15rem 1.35rem 1.75rem; }
 
-.thesis { font-size: 1.12rem; }
+.thesis { font-size: 15px; }
 
 .thesis-head, .page-head, .modal-head {
   display: flex;
@@ -367,13 +375,13 @@ a { color: inherit; }
 
 .thesis-head h2, .page-head h2, .chat-head h2 {
   margin: 0;
-  font-size: 2.35rem;
+  font-size: 1.45rem;
   font-weight: 640;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-.page-head h2, .chat-head h2 { font-size: 1.85rem; }
+.page-head h2, .chat-head h2 { font-size: 1.15rem; }
 
 h3 {
   margin: 0 0 0.85rem;
@@ -403,15 +411,15 @@ h3 {
 
 .meta-grid, .field-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1.15rem 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem 1.15rem;
 }
 
-.result-meta { margin: 2.75rem 0 0.5rem; }
+.result-meta { margin: 1rem 0 0.35rem; }
 
 .result-meta .banner { margin-bottom: 1.15rem; }
 
-.thesis > .banner { margin-bottom: 2rem; }
+.thesis > .banner { margin-bottom: 1rem; }
 
 .result-meta .banner {
   display: inline-block;
@@ -434,7 +442,7 @@ dt {
 dd { margin: 0.28rem 0 0; }
 
 .structured, fieldset {
-  margin: 1.75rem 0 0;
+  margin: 1rem 0 0;
   padding: 1.2rem 1.3rem 1.35rem;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -475,7 +483,7 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
 
 .proposal-diff li { display: block; }
 
-.narrative { margin-top: 1.75rem; }
+.narrative { margin-top: 1rem; }
 
 .narrative .prose {
   border: 1px solid var(--line);
@@ -489,8 +497,8 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
   padding: 1.6rem 1.75rem 2rem;
   outline: none;
   font-family: var(--serif);
-  font-size: 1.32rem;
-  line-height: 1.75;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 .ProseMirror p { margin: 0 0 0.9rem; }
@@ -504,7 +512,7 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
 }
 
 .proposal, .inspector, .chart-frame, .empty-state {
-  margin-top: 1.75rem;
+  margin-top: 1rem;
   padding: 1.25rem 1.35rem 1.4rem;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -517,7 +525,7 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
 
 .proposal-state { margin: 1.35rem 0 0; color: var(--text-dim); }
 
-.revisions { margin-top: 1.85rem; }
+.revisions { margin-top: 1rem; }
 
 .revisions ol {
   list-style: none;
@@ -570,7 +578,7 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
 .stance-neutral { color: var(--text-dim); background: transparent; border-color: var(--line); }
 .stance-insufficient_evidence { color: var(--accent); background: var(--accent-soft); }
 
-.chart-frame { padding: 1.75rem 1.6rem 1.85rem; }
+.chart-frame { padding: 1rem 1.1rem 1.15rem; }
 
 .chart-canvas-wrap {
   position: relative;
@@ -583,7 +591,7 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
 
 .chart-canvas {
   position: relative;
-  height: 640px;
+  height: 420px;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -631,9 +639,9 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
 
 .chat { display: flex; flex-direction: column; min-height: 0; width: 100%; }
 
-.chat-head { padding: 1.85rem 1.85rem 0.35rem; }
+.chat-head { padding: 0.85rem 1rem 0.25rem; }
 
-.messages { flex: 1; overflow: auto; padding: 1rem 1.85rem 2rem; font-size: 1.05rem; }
+.messages { flex: 1; overflow: auto; padding: 0.65rem 1rem 1rem; font-size: 14px; min-height: 0; }
 
 .messages ol {
   list-style: none;
@@ -641,10 +649,14 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 0.85rem;
 }
 
-.message { max-width: 40rem; }
+.message {
+  max-width: 40rem;
+  overflow: visible;
+  overflow-wrap: break-word;
+}
 
 .message-user {
   margin-left: auto;
@@ -662,22 +674,28 @@ input, select, textarea { padding: 0.6rem 0.7rem; width: 100%; }
   text-transform: uppercase;
 }
 
-.message p { margin: 0.45rem 0 0; line-height: 1.65; font-size: 1.06rem; }
+.message p { margin: 0.35rem 0 0; line-height: 1.45; font-size: 14px; }
 
 .message .banner { margin-top: 0.45rem; }
 
 .composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.9rem;
-  padding: 1.25rem 1.5rem 1.45rem;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem 0.8rem;
   border-top: 1px solid var(--line);
   align-items: end;
+  flex: none;
 }
 
-.composer textarea { min-height: 5.25rem; resize: vertical; }
+.composer textarea {
+  min-height: 4.2rem;
+  line-height: 1.45;
+  resize: vertical;
+  overflow: auto;
+}
 
-.page section { margin-top: 2.15rem; }
+.page section { margin-top: 1.15rem; }
 
 .page section > p:first-of-type { margin-top: 0; }
 
@@ -894,7 +912,6 @@ p[role="alert"] { color: var(--down); }
   }
   .report { grid-row: 1; }
   .chat-slot { grid-row: 2; border-top: 1px solid var(--line); }
-  .thesis, .page { padding: 1.75rem 1.35rem 2.75rem; }
-  .thesis-head h2 { font-size: 1.85rem; }
-  .chart-canvas { height: 480px; }
+  .thesis, .page { padding: 1rem 1rem 1.5rem; }
+  .chart-canvas { height: 360px; }
 }
