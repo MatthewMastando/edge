@@ -255,3 +255,86 @@ def test_contract_code_keeps_event_keys_distinct() -> None:
     assert event_identity(first.events[0]) != event_identity(second.events[0])
     assert first.events[0].contract_code == "ESU6"
     assert second.events[0].contract_code == "ESZ6"
+
+
+def test_pool_span_and_separation_boundaries() -> None:
+    calendar = crypto_calendar()
+    within = make_bars(
+        [ohlc(10, high=high, low=1) for high in (10, 20, 20, 12)],
+        start=utc(2026, 9, 7),
+    )
+    pools = LiquidityPoolDetector().run(detector_input(within, calendar))
+    highs = [event for event in pools.events if event.levels[0].name == "equal_high"]
+    assert len(highs) == 1
+    assert highs[0].levels[0].price == Decimal(12)
+    assert highs[0].details["members"] == [0, 3]
+
+    too_wide = make_bars(
+        [ohlc(10, high=high, low=1) for high in (10, 20, 20, 13)],
+        start=utc(2026, 9, 7),
+    )
+    wide = LiquidityPoolDetector().run(detector_input(too_wide, calendar))
+    assert [event for event in wide.events if event.levels[0].name == "equal_high"] == []
+
+    close_together = make_bars(
+        [ohlc(10, high=high, low=1) for high in (10, 20, 10, 30)],
+        start=utc(2026, 9, 7),
+    )
+    near = LiquidityPoolDetector().run(detector_input(close_together, calendar))
+    assert [event for event in near.events if event.levels[0].name == "equal_high"] == []
+
+
+def test_pool_does_not_cross_a_roll_and_pivot_wing_skips_a_session_gap() -> None:
+    rolled = make_bars(
+        [ohlc(10, high=high, low=1) for high in (50, 20, 20, 50)],
+        start=utc(2026, 9, 7),
+        contracts=["ESU6", "ESU6", "ESU6", "ESZ6"],
+    )
+    pools = LiquidityPoolDetector().run(detector_input(rolled, crypto_calendar()))
+    assert [event for event in pools.events if event.levels[0].name == "equal_high"] == []
+
+    day1 = [utc(2026, 9, 7, 9, minute) for minute in (0, 15, 30, 45)]
+    day2 = [utc(2026, 9, 8, 9, minute) for minute in (0, 15, 30)]
+    highs = [10, 11, 12, 40, 12, 11, 10]
+    gap_bars = make_bars(
+        [ohlc(4, high=high, low=1) for high in highs],
+        start=day1[0],
+        origins=day1 + day2,
+    )
+    pivots = SwingPivotDetector().run(detector_input(gap_bars, short_session_calendar()))
+    assert pivots.events == []
+
+
+def test_correlation_skips_the_roll_return_and_rejects_missing_bars() -> None:
+    closes = [Decimal(10 + index) for index in range(8)]
+    contracts = ["ESU6"] * 4 + ["ESZ6"] * 4
+    bars = make_bars(
+        [ohlc(format(close, "f")) for close in closes],
+        start=utc(2026, 9, 7),
+        contracts=contracts,
+    )
+    data = detector_input(
+        bars,
+        crypto_calendar(),
+        parameters={"other_bars": other_rows(bars), "other_instrument_id": "other-1"},
+    )
+    output = CorrelationDetector().run(data)
+    assert output.features[-1].details["n"] == 6
+    assert output.features[-1].details["correlation"] == "1"
+    assert any("roll" in warning for warning in output.warnings)
+    assert replay_violations(incremental_replay(CorrelationDetector(), data)) == []
+
+    origins = [utc(2026, 9, 7) + timedelta(minutes=15 * index) for index in (0, 1, 2, 4)]
+    holed = make_bars(
+        [ohlc(format(Decimal(10 + index), "f")) for index in range(4)],
+        start=origins[0],
+        origins=origins,
+    )
+    with pytest.raises(InsufficientDataError, match="missing bar"):
+        CorrelationDetector().run(
+            detector_input(
+                holed,
+                crypto_calendar(),
+                parameters={"other_bars": other_rows(holed), "other_instrument_id": "other-1"},
+            )
+        )

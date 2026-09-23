@@ -11,7 +11,7 @@ from trading_core.ta.constants import (
     RSI_DIV_MIN_SEPARATION,
     RSI_PERIOD,
 )
-from trading_core.ta.detectors.common import bind, finish, require_count, with_rolls
+from trading_core.ta.detectors.common import bind, finish, price_level, require_count, with_rolls
 from trading_core.ta.divergence import Divergence, divergence_details, find_divergences
 from trading_core.ta.envelope import FeatureDraft
 from trading_core.ta.parsing import param_bool, param_decimal, param_int
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from pydantic import JsonValue
 
     from trading_core.domain.common import CalcVersion, Direction, SessionScope
-    from trading_core.domain.ta import DetectorName
+    from trading_core.domain.ta import DetectorName, Level
     from trading_core.ta.interfaces import DetectorInput, DetectorOutput
 
 
@@ -96,7 +96,7 @@ def _merge(
             FeatureDraft(
                 direction=direction,
                 session=session,
-                levels=[],
+                levels=_levels(items),
                 state="confirmed",
                 origin_time=second.origin_time,
                 origin_tz=second.origin_tz,
@@ -107,6 +107,15 @@ def _merge(
             )
         )
     return drafts
+
+
+def _levels(items: list[Divergence]) -> list[Level]:
+    levels: list[Level] = []
+    for index, item in enumerate(items):
+        suffix = "" if len(items) == 1 else f"_{index + 1}"
+        levels.append(price_level(f"price_first{suffix}", item.price_first))
+        levels.append(price_level(f"price_second{suffix}", item.price_second))
+    return levels
 
 
 def _bundle(items: list[Divergence]) -> tuple[Direction, dict[str, JsonValue]]:

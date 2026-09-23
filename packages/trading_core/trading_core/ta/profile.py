@@ -23,8 +23,10 @@ from typing import TYPE_CHECKING, Literal
 
 from trading_core.ta.calendar import expected_origins, locate_session, rth_bounds, trading_bounds
 from trading_core.ta.constants import (
+    NODE_EXTREMUM_WING,
     NODE_HVN_PERCENTILE,
     NODE_LVN_PERCENTILE,
+    NODE_MA_BINS,
     VALUE_AREA_FRACTION,
 )
 from trading_core.ta.interfaces import InsufficientDataError
@@ -32,7 +34,7 @@ from trading_core.ta.series import PreparedSeries, bar_close_time, bar_step, is_
 from trading_core.ta.session_levels import session_has_overnight
 
 if TYPE_CHECKING:
-    from datetime import date, datetime
+    from datetime import date, datetime, timedelta
 
     from trading_core.domain.instruments import SessionCalendar
     from trading_core.domain.market import Bar, Trade
@@ -151,34 +153,71 @@ def split_even(volume: Decimal, count: int) -> list[Decimal]:
     return [Decimal(base + (1 if index < remainder else 0)) * quantum for index in range(count)]
 
 
-def trades_in_window(trades: list[Trade], window: ProfileWindow) -> list[Trade]:
-    end = window.end
+def trades_for_bars(bars: list[Bar], trades: list[Trade]) -> list[Trade]:
+    """Prints inside completed bars only. A later print with no bar is not profile volume."""
+    if not bars:
+        return []
+    step = bar_step(bars[0].timeframe)
     selected: list[Trade] = []
     for trade in trades:
-        if trade.trade_time < window.start or trade.trade_time >= end:
-            continue
-        if window.contract_code is not None and trade.contract_code != window.contract_code:
-            continue
-        selected.append(trade)
+        if trade.size < 0:
+            msg = "trade size is negative"
+            raise ValueError(msg)
+        for bar in bars:
+            if bar.contract_code is not None and trade.contract_code != bar.contract_code:
+                continue
+            close = bar.origin_time + step
+            if bar.origin_time <= trade.trade_time < close:
+                selected.append(trade)
+                break
     return selected
 
 
+def trade_coverage_matches(bars: list[Bar], trades: list[Trade]) -> bool:
+    """True when positive bar volume equals in-bar print size and some size was printed."""
+    if not bars:
+        return False
+    step = bar_step(bars[0].timeframe)
+    saw_size = False
+    for bar in bars:
+        traded = _size_in_bar(bar, trades, step)
+        if bar.volume > 0 and traded != bar.volume:
+            return False
+        if traded > 0:
+            saw_size = True
+    return saw_size
+
+
 def assert_trade_coverage(bars: list[Bar], trades: list[Trade]) -> None:
-    """A bar with volume and no prints is missing coverage, not zero volume."""
+    """A shortfall against bar volume is missing coverage, not zero volume."""
     if not bars:
         return
     step = bar_step(bars[0].timeframe)
     for bar in bars:
         if bar.volume <= 0:
             continue
-        close = bar.origin_time + step
-        covered = any(bar.origin_time <= trade.trade_time < close for trade in trades)
-        if not covered:
+        traded = _size_in_bar(bar, trades, step)
+        if traded != bar.volume:
             msg = (
-                f"bar {bar.origin_time.isoformat()} has volume but no trade prints; "
-                "refusing to treat the gap as zero volume"
+                f"bar {bar.origin_time.isoformat()} volume is {format(bar.volume, 'f')} "
+                f"but in-bar trade size sums to {format(traded, 'f')}; "
+                "missing coverage is not zero volume"
             )
             raise InsufficientDataError(msg)
+
+
+def _size_in_bar(bar: Bar, trades: list[Trade], step: timedelta) -> Decimal:
+    close = bar.origin_time + step
+    total = Decimal(0)
+    for trade in trades:
+        if trade.size < 0:
+            msg = "trade size is negative"
+            raise ValueError(msg)
+        if bar.contract_code is not None and trade.contract_code != bar.contract_code:
+            continue
+        if bar.origin_time <= trade.trade_time < close:
+            total += trade.size
+    return total
 
 
 def select_windows(
@@ -278,11 +317,13 @@ def _expansion_side(
 
 def _nodes(volumes: list[Decimal]) -> tuple[list[int], list[int], Decimal | None, Decimal | None]:
     count = len(volumes)
-    if count < 3:
+    if count < NODE_MA_BINS:
         return [], [], None, None
+    half = NODE_MA_BINS // 2
     smoothed: list[Decimal | None] = [None] * count
-    for index in range(1, count - 1):
-        smoothed[index] = (volumes[index - 1] + volumes[index] + volumes[index + 1]) / Decimal(3)
+    for index in range(half, count - half):
+        window = volumes[index - half : index + half + 1]
+        smoothed[index] = sum(window, start=Decimal(0)) / Decimal(NODE_MA_BINS)
     samples = sorted(value for value in smoothed if value is not None and value != 0)
     if not samples:
         return [], [], None, None
@@ -309,8 +350,8 @@ def _extrema(smoothed: list[Decimal | None], *, kind: str, threshold: Decimal) -
         end = index
         while end + 1 < last and smoothed[end + 1] == smoothed[index]:
             end += 1
-        if _is_extremum(smoothed, index, end, kind):
-            middle = index + ((end - index) // 2)
+        middle = index + ((end - index) // 2)
+        if _is_local_extremum(smoothed, middle, kind):
             value = smoothed[middle]
             if value is not None and _passes(value, threshold, kind):
                 found.append(middle)
@@ -324,18 +365,30 @@ def _passes(value: Decimal, threshold: Decimal, kind: str) -> bool:
     return value <= threshold
 
 
-def _is_extremum(smoothed: list[Decimal | None], left: int, right: int, kind: str) -> bool:
-    count = len(smoothed)
-    if left - 2 < 1 or right + 2 > count - 2:
+def _is_local_extremum(smoothed: list[Decimal | None], middle: int, kind: str) -> bool:
+    """Strict against bins within ±wing of the plateau middle. Equal bins are the plateau tie."""
+    value = smoothed[middle]
+    if value is None:
         return False
-    value = smoothed[left]
-    neighbors = [smoothed[offset] for offset in range(left - 2, left)]
-    neighbors.extend(smoothed[offset] for offset in range(right + 1, right + 3))
-    if value is None or any(item is None for item in neighbors):
+    strict: list[Decimal] = []
+    start = middle - NODE_EXTREMUM_WING
+    stop = middle + NODE_EXTREMUM_WING
+    for offset in range(start, stop + 1):
+        if offset == middle:
+            continue
+        if offset < 0 or offset >= len(smoothed):
+            return False
+        neighbor = smoothed[offset]
+        if neighbor is None:
+            return False
+        if neighbor == value:
+            continue
+        strict.append(neighbor)
+    if not strict:
         return False
     if kind == "max":
-        return all(item < value for item in neighbors if item is not None)
-    return all(item > value for item in neighbors if item is not None)
+        return all(item < value for item in strict)
+    return all(item > value for item in strict)
 
 
 def _scoped_windows(
@@ -351,6 +404,12 @@ def _scoped_windows(
         is_first = position == 0
         if scope == "prior_session" and is_last:
             continue
+        # A session becomes "prior" when the next session's first bar closes. Logging it at
+        # the prior session's own close would be a back-dated event on that later bar.
+        prior_confirm = None
+        if scope == "prior_session":
+            next_indexes = groups[position + 1][1]
+            prior_confirm = bar_close_time(prepared.bars[next_indexes[0]])
         if scope == "eth":
             eth_window = _eth_window(
                 prepared, calendar, session_day, indexes, is_first=is_first, is_last=is_last
@@ -369,7 +428,15 @@ def _scoped_windows(
                 msg = "missing bar inside a profile window"
                 raise InsufficientDataError(msg)
             windows.append(
-                _window_from_indexes(prepared, indexes_in, start, end, session_day, coverage)
+                _window_from_indexes(
+                    prepared,
+                    indexes_in,
+                    start,
+                    end,
+                    session_day,
+                    coverage,
+                    confirm_at=prior_confirm,
+                )
             )
     if not windows:
         msg = f"no {scope} window with usable coverage"
@@ -497,6 +564,7 @@ def _window_from_indexes(
     end: datetime,
     session_day: date | None,
     coverage: str,
+    confirm_at: datetime | None = None,
 ) -> ProfileWindow:
     codes = {prepared.bars[index].contract_code for index in indexes}
     if len(codes) > 1:
@@ -505,7 +573,9 @@ def _window_from_indexes(
     complete = coverage == "full"
     confirmation = None
     if complete and indexes:
-        confirmation = bar_close_time(prepared.bars[indexes[-1]])
+        confirmation = confirm_at
+        if confirmation is None:
+            confirmation = bar_close_time(prepared.bars[indexes[-1]])
     return ProfileWindow(
         start=start,
         end=end,

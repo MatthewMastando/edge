@@ -255,10 +255,6 @@ def _event_sort(event: TAEvent) -> tuple[datetime, datetime, str]:
     return (event.origin_time, event.event_time, event.direction)
 
 
-def quantize(value: Decimal, places: Decimal) -> Decimal:
-    return value.quantize(places)
-
-
 EventIdentity = tuple[object, ...]
 
 

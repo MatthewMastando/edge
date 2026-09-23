@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from trading_core.ta.constants import CALC_VERSION
+from trading_core.ta.constants import BOS_TICKS, CALC_VERSION
 from trading_core.ta.detectors.common import bind, finish, price_level, require_count, with_rolls
 from trading_core.ta.envelope import FeatureDraft
 from trading_core.ta.series import PreparedSeries, bar_close_time
@@ -34,7 +34,7 @@ class BosDetector:
     def run(self, data: DetectorInput) -> DetectorOutput:
         params, prepared = bind(data, self.default_parameters())
         require_count(prepared, 7, "break of structure")
-        breaks = find_breaks(prepared, detect_swings(prepared), prepared.tick)
+        breaks = find_breaks(prepared, detect_swings(prepared), prepared.tick * BOS_TICKS)
         drafts = [_draft(prepared, item, data.session) for item in breaks]
         return finish(
             name=self.name, data=data, prepared=prepared, params=params, drafts=drafts, warnings=[]

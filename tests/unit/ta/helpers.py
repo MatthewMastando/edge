@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -125,7 +126,7 @@ def make_bars(
     timeframe: Timeframe = "15m",
     step: timedelta | None = None,
     contract: str | None = "ESZ6",
-    contracts: list[str | None] | None = None,
+    contracts: Sequence[str | None] | None = None,
     volume: str = "1",
     origins: list[datetime] | None = None,
 ) -> list[Bar]:

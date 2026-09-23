@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from trading_core.ta.constants import ATR_PERIOD, PUBLISHED_PLACES, RSI_PERIOD
+from trading_core.ta.constants import ATR_PERIOD, RSI_PERIOD
 from trading_core.ta.interfaces import InsufficientDataError
 
 if TYPE_CHECKING:
@@ -104,10 +104,6 @@ def require_no_missing(prepared: PreparedSeries, what: str) -> None:
     if "missing" in prepared.gaps:
         msg = f"{what} refuses to compute across a missing bar"
         raise InsufficientDataError(msg)
-
-
-def publish(value: Decimal) -> Decimal:
-    return value.quantize(PUBLISHED_PLACES)
 
 
 def _map_segments(

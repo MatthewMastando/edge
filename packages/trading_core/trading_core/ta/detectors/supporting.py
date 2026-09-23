@@ -56,6 +56,7 @@ class SwingPivotDetector:
                 levels.append(price_level("swing_high", bar.high))
             if swing.is_low:
                 levels.append(price_level("swing_low", bar.low))
+            confirm = prepared.bars[swing.confirmation_index]
             drafts.append(
                 FeatureDraft(
                     direction="neutral",
@@ -65,7 +66,7 @@ class SwingPivotDetector:
                     origin_time=swing.origin_time,
                     origin_tz=swing.origin_tz,
                     confirmation_time=swing.confirmation_time,
-                    confirmation_tz=bar.origin_tz,
+                    confirmation_tz=confirm.origin_tz,
                     contract_code=swing.contract_code,
                     details={
                         "index": swing.index,
@@ -305,38 +306,59 @@ class CorrelationDetector:
         if not isinstance(other_id, str) or not other_id:
             msg = "correlation requires other_instrument_id"
             raise ValueError(msg)
+        require_no_missing(prepared, "correlation")
         right = _other_closes(params)
         if not right:
             msg = "correlation requires other_bars"
             raise InsufficientDataError(msg)
-        left = [(bar.origin_time, bar.close) for bar in prepared.bars]
-        coefficient, count = aligned_return_correlation(left, right)
-        origin = prepared.bars[0]
-        confirm = prepared.bars[-1]
-        draft = FeatureDraft(
-            direction="neutral",
-            session=data.session,
-            levels=[],
-            state="confirmed",
-            origin_time=origin.origin_time,
-            origin_tz=origin.origin_tz,
-            confirmation_time=bar_close_time(confirm),
-            confirmation_tz=confirm.origin_tz,
-            contract_code=contract_of(origin),
-            details={
-                "correlation": decimal_str(coefficient),
-                "n": count,
-                "method": "sample_pearson",
-                "other_instrument_id": other_id,
-            },
+        skip = frozenset(
+            prepared.bars[index + 1].origin_time
+            for index, gap in enumerate(prepared.gaps)
+            if gap == "roll"
         )
+        drafts: list[FeatureDraft] = []
+        last_error: InsufficientDataError | None = None
+        for index, bar in enumerate(prepared.bars):
+            left = [(item.origin_time, item.close) for item in prepared.bars[: index + 1]]
+            right_now = [item for item in right if item[0] <= bar.origin_time]
+            try:
+                coefficient, count = aligned_return_correlation(left, right_now, skip_origins=skip)
+            except InsufficientDataError as exc:
+                last_error = exc
+                continue
+            drafts.append(
+                FeatureDraft(
+                    direction="neutral",
+                    session=data.session,
+                    levels=[],
+                    state="confirmed",
+                    origin_time=bar.origin_time,
+                    origin_tz=bar.origin_tz,
+                    confirmation_time=bar_close_time(bar),
+                    confirmation_tz=bar.origin_tz,
+                    contract_code=contract_of(bar),
+                    details={
+                        "index": index,
+                        "correlation": decimal_str(coefficient),
+                        "n": count,
+                        "method": "sample_pearson",
+                        "other_instrument_id": other_id,
+                    },
+                )
+            )
+        if not drafts:
+            if last_error is not None:
+                raise last_error
+            msg = "correlation needs aligned returns"
+            raise InsufficientDataError(msg)
+        warnings = ["correlation skips the return that crosses a contract roll"] if skip else []
         return finish(
             name=self.name,
             data=data,
             prepared=prepared,
             params=params,
-            drafts=[draft],
-            warnings=[],
+            drafts=drafts,
+            warnings=warnings,
         )
 
 

@@ -6,6 +6,7 @@ Trade prints are exact volume-at-price. Bars alone are refused unless
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from trading_core.ta.constants import BAR_APPROXIMATION_WARNING, CALC_VERSION, COMPOSITE_SESSIONS
@@ -21,7 +22,8 @@ from trading_core.ta.profile import (
     histogram_from_bars,
     histogram_from_trades,
     select_windows,
-    trades_in_window,
+    trade_coverage_matches,
+    trades_for_bars,
 )
 
 if TYPE_CHECKING:
@@ -77,14 +79,18 @@ class VolumeProfileDetector:
             range_start=param_optional_time(params, "range_start"),
             range_end=param_optional_time(params, "range_end"),
         )
-        profiles = [
+        built = [
             _one(prepared, _bars(prepared, window), trades, window, approximate)
             for window in windows
         ]
-        warnings = (
-            [BAR_APPROXIMATION_WARNING] if any(item.source != "trades" for item in profiles) else []
-        )
-        drafts = [_draft(prepared, profile, data.session) for profile in profiles]
+        warnings: list[str] = []
+        if any(item.profile.source != "trades" for item in built):
+            warnings.append(BAR_APPROXIMATION_WARNING)
+        for item in built:
+            for warning in item.warnings:
+                if warning not in warnings:
+                    warnings.append(warning)
+        drafts = [_draft(prepared, item.profile, data.session, item.warnings) for item in built]
         return finish(
             name=self.name,
             data=data,
@@ -99,31 +105,47 @@ def _bars(prepared: PreparedSeries, window: ProfileWindow) -> list[Bar]:
     return [prepared.bars[index] for index in window.bar_indexes]
 
 
+@dataclass(frozen=True)
+class _BuiltProfile:
+    profile: VolumeProfile
+    warnings: list[str]
+
+
 def _one(
     prepared: PreparedSeries,
     bars: list[Bar],
     trades: list[Trade] | None,
     window: ProfileWindow,
     approximate: bool,
-) -> VolumeProfile:
-    if trades is not None:
-        selected = trades_in_window(trades, window)
-        if selected:
-            if not approximate:
-                assert_trade_coverage(bars, selected)
-            prices, volumes = histogram_from_trades(selected, prepared.tick)
-            return build_profile(prices, volumes, window, "trades")
+) -> _BuiltProfile:
+    selected = [] if trades is None else trades_for_bars(bars, trades)
+    if trades is not None and trade_coverage_matches(bars, selected):
+        prices, volumes = histogram_from_trades(selected, prepared.tick)
+        return _BuiltProfile(build_profile(prices, volumes, window, "trades"), [])
     if not approximate:
+        if trades is not None:
+            assert_trade_coverage(bars, selected)
         raise InsufficientDataError(_NO_PRINTS)
+    warnings: list[str] = []
+    if trades is not None:
+        warnings.append("trade prints do not match bar volume; bar-range approximation used")
     prices, volumes = histogram_from_bars(bars, prepared.tick)
-    return build_profile(prices, volumes, window, "bar_range_approximation")
+    return _BuiltProfile(
+        build_profile(prices, volumes, window, "bar_range_approximation"), warnings
+    )
 
 
-def _draft(prepared: PreparedSeries, profile: VolumeProfile, session: SessionScope) -> FeatureDraft:
+def _draft(
+    prepared: PreparedSeries,
+    profile: VolumeProfile,
+    session: SessionScope,
+    extra_warnings: list[str],
+) -> FeatureDraft:
     window = profile.window
     state: FeatureState = "confirmed" if window.complete else "pending"
     last = prepared.bars[window.bar_indexes[-1]]
     warnings = [BAR_APPROXIMATION_WARNING] if profile.source != "trades" else []
+    warnings.extend(extra_warnings)
     levels = _levels(profile)
     details = _details(profile, prepared.tick)
     confirmed = window.confirmation_time

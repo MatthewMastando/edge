@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from trading_core.ta.constants import CALC_VERSION
+from trading_core.ta.constants import CALC_VERSION, SWEEP_TICKS
 from trading_core.ta.detectors.common import bind, finish, price_level, with_rolls
 from trading_core.ta.envelope import FeatureDraft
 from trading_core.ta.liquidity import Sweep, collect_levels, find_sweeps, sweep_details
@@ -36,7 +36,7 @@ class LiquiditySweepDetector:
         swings = detect_swings(prepared)
         pools = detect_pools(prepared, prepared.tick)
         levels = collect_levels(prepared, data.calendar, swings, pools)
-        sweeps = find_sweeps(prepared, levels, prepared.tick)
+        sweeps = find_sweeps(prepared, levels, prepared.tick * SWEEP_TICKS)
         drafts = [_draft(prepared, sweep, data.session) for sweep in sweeps]
         return finish(
             name=self.name, data=data, prepared=prepared, params=params, drafts=drafts, warnings=[]

@@ -1,8 +1,9 @@
 """Pearson correlation of aligned bar-to-bar returns.
 
 A return is aligned only when both series step from the same previous timestamp to the
-same current timestamp. Sample correlation (divisor n - 1) is used. A flat series has
-undefined correlation and is rejected rather than reported as zero.
+same current timestamp. ``skip_origins`` drops returns whose current bar opens a roll.
+Sample correlation (divisor n - 1) is used. A flat series has undefined correlation and
+is rejected rather than reported as zero.
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ if TYPE_CHECKING:
 def aligned_return_correlation(
     left: list[tuple[datetime, Decimal]],
     right: list[tuple[datetime, Decimal]],
+    *,
+    skip_origins: frozenset[datetime] | None = None,
 ) -> tuple[Decimal, int]:
     left_closes = _unique(left, "left")
     right_closes = _unique(right, "right")
@@ -31,6 +34,8 @@ def aligned_return_correlation(
         if instant not in left_prev or instant not in right_prev:
             continue
         if left_prev[instant] != right_prev[instant]:
+            continue
+        if skip_origins is not None and instant in skip_origins:
             continue
         previous_left = left_closes[left_prev[instant]]
         previous_right = right_closes[right_prev[instant]]

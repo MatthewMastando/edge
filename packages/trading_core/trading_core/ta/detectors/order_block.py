@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from trading_core.ta.constants import ATR_PERIOD, CALC_VERSION, DISPLACEMENT_BODY_RATIO, OB_LOOKBACK
+from trading_core.ta.constants import (
+    ATR_PERIOD,
+    BOS_TICKS,
+    CALC_VERSION,
+    DISPLACEMENT_BODY_RATIO,
+    OB_LOOKBACK,
+)
 from trading_core.ta.detectors.common import bind, finish, price_level, require_count, with_rolls
 from trading_core.ta.envelope import FeatureDraft, decimal_str
 from trading_core.ta.parsing import param_bool, param_decimal, param_int
@@ -48,7 +54,7 @@ class OrderBlockDetector:
             split_on=frozenset({"roll", "missing"}),
             allow_short=True,
         )
-        breaks = find_breaks(prepared, detect_swings(prepared), prepared.tick)
+        breaks = find_breaks(prepared, detect_swings(prepared), prepared.tick * BOS_TICKS)
         blocks, skipped_atr = find_order_blocks(
             prepared,
             breaks,
@@ -77,7 +83,7 @@ def _draft(
 ) -> FeatureDraft:
     origin = prepared.bars[block.candle_index]
     confirm = prepared.bars[block.break_index]
-    state, transitions = track_order_block(prepared, block)
+    state, transitions, traversed = track_order_block(prepared, block)
     levels = [
         price_level("zone_lower", block.zone_lower, "zone_lower"),
         price_level("zone_upper", block.zone_upper, "zone_upper"),
@@ -92,6 +98,10 @@ def _draft(
         "invalidation": decimal_str(block.invalidation),
         "use_body": use_body,
     }
+    revisited = any(item.to_state == "revisited" for item in transitions)
+    live = dict(snapshot)
+    live["revisited"] = revisited
+    live["traversed"] = traversed
     return FeatureDraft(
         direction=block.direction,
         session=session,
@@ -102,7 +112,7 @@ def _draft(
         confirmation_time=bar_close_time(confirm),
         confirmation_tz=confirm.origin_tz,
         contract_code=block.contract_code,
-        details=dict(snapshot),
+        details=live,
         event_levels=levels,
         event_details=dict(snapshot),
         event_time=bar_close_time(confirm),

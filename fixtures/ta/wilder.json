@@ -6,5 +6,14 @@
     "14": "64.28571428571428571428571429",
     "15": "69.04761904761904761904761903"
   },
-  "notes": "First 14 close-to-close changes: gains sum 9, losses sum 5. RSI = 100 * 9 / 14. The next change is +2."
+  "atr_smoothing": {
+    "index_14": "1",
+    "index_15": "2"
+  },
+  "rsi_zero_average": {
+    "flat": "50",
+    "rising": "100",
+    "falling": "0"
+  },
+  "notes": "RSI seed: first 14 close-to-close changes have gains summing to 9 and losses summing to 5, so RSI at index 14 is 100 * 9 / 14. The next change is +2, and the Wilder step is (13 * prior + current) / 14. ATR smoothing uses true range 1 on bars 1..14 (seed 1 at index 14) and true range 15 on bar 15, so index 15 is (13 * 1 + 15) / 14 = 2. Flat closes are 50, a strictly rising seed is 100, and a strictly falling seed is 0."
 }

@@ -110,7 +110,12 @@ def find_order_blocks(
 
 def track_order_block(
     prepared: PreparedSeries, block: OrderBlock
-) -> tuple[FeatureState, list[TransitionDraft]]:
+) -> tuple[FeatureState, list[TransitionDraft], bool]:
+    """Return state, transitions, and whether any later bar traversed the full zone.
+
+    The confirmed-event snapshot stays the break. Traversal discovered on a later bar is
+    reported on the live feature and is not written back into an earlier transition.
+    """
     state: FeatureState = "confirmed"
     transitions: list[TransitionDraft] = []
     traversed = False
@@ -133,7 +138,7 @@ def track_order_block(
             transitions.append(_transition(state, "invalidated", bar, covers or traversed))
             state = "invalidated"
             break
-    return state, transitions
+    return state, transitions, traversed
 
 
 def _break(

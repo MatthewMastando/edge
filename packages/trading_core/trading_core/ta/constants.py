@@ -35,7 +35,5 @@ COMPOSITE_SESSIONS = 5
 # Bar-only volume profile. Never presented as trade volume-at-price.
 BAR_APPROXIMATION_WARNING = "approximation: bar-range volume is not trade volume-at-price"
 
-# Published indicator and correlation values are rounded half-even so fixture
-# comparisons do not depend on binary float. Wilder state itself stays exact;
-# only the value written onto a feature is quantized.
-PUBLISHED_PLACES = Decimal("0.00000001")
+# Feature values stay exact. Fixtures compare the Wilder recurrence itself, not a
+# rounded display value.

@@ -12,7 +12,7 @@
   "achieved_coverage": "0.9032258064516129032258064516",
   "p25": "1.00",
   "p75": "3.666666666666666666666666667",
-  "hvn": ["105"],
+  "hvn": ["105", "111"],
   "lvn": ["108"],
-  "notes": "POC tie at 105 and 111 keeps 105. Value area expands to bins 100 through 111 (28 of 31). The second 11/3 plateau touches the unsmoothed edge, so only 105 is an HVN. The interior low plateau is centered at 108."
+  "notes": "POC tie at 105 and 111 keeps 105. Value area expands to bins 100 through 111 (28 of 31). Both 11/3 plateaus are HVNs: the extremum is the plateau middle (lower middle when the length is even) checked within ±2 of that middle, so 105 and 111 both qualify. The interior low plateau is centered at 108."
 }

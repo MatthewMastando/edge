@@ -1,11 +1,10 @@
-"""Wilder RSI(14) and ATR(14) against an independent oracle and fixtures/ta/wilder.json."""
+"""Wilder RSI(14) and ATR(14) against fixtures/ta/wilder.json."""
 
 from __future__ import annotations
 
 import json
 from datetime import timedelta
 from decimal import Decimal
-from itertools import pairwise
 
 import pytest
 from tests.conftest import FIXTURES_DIR
@@ -43,45 +42,16 @@ def _string_map(value: object) -> dict[str, str]:
     return out
 
 
-def _oracle_rsi(closes: list[Decimal], period: int = 14) -> list[Decimal]:
-    gains: list[Decimal] = []
-    losses: list[Decimal] = []
-    for previous, current in pairwise(closes):
-        delta = current - previous
-        gains.append(delta if delta > 0 else Decimal(0))
-        losses.append(-delta if delta < 0 else Decimal(0))
-    avg_gain = sum(gains[:period], start=Decimal(0)) / Decimal(period)
-    avg_loss = sum(losses[:period], start=Decimal(0)) / Decimal(period)
-    points = [_rsi(avg_gain, avg_loss)]
-    for gain, loss in zip(gains[period:], losses[period:], strict=True):
-        avg_gain = ((Decimal(period - 1) * avg_gain) + gain) / Decimal(period)
-        avg_loss = ((Decimal(period - 1) * avg_loss) + loss) / Decimal(period)
-        points.append(_rsi(avg_gain, avg_loss))
-    return points
-
-
-def _rsi(avg_gain: Decimal, avg_loss: Decimal) -> Decimal:
-    if avg_gain == 0 and avg_loss == 0:
-        return Decimal(50)
-    if avg_loss == 0:
-        return Decimal(100)
-    if avg_gain == 0:
-        return Decimal(0)
-    return Decimal(100) * avg_gain / (avg_gain + avg_loss)
-
-
 def _bars_from_closes(closes: list[Decimal]) -> list[Bar]:
     candles = [ohlc(format(close, "f")) for close in closes]
     return make_bars(candles, start=utc(2026, 9, 7))
 
 
-def test_fixture_rsi_matches_oracle_and_library() -> None:
+def test_fixture_rsi_matches_library() -> None:
     raw = _load()
     closes = [Decimal(item) for item in _string_list(raw["closes"])]
     expected = _string_map(raw["rsi"])
-    oracle = _oracle_rsi(closes)
     library = wilder_rsi(closes)
-    assert [format(value, "f") for value in oracle] == [expected["14"], expected["15"]]
     assert [format(point.value, "f") for point in library] == [expected["14"], expected["15"]]
     assert library[0].index == 14
 
@@ -95,14 +65,33 @@ def test_fixture_rsi_matches_oracle_and_library() -> None:
 
 
 def test_rsi_zero_average_cases() -> None:
+    raw = _load()
+    expected = _string_map(raw["rsi_zero_average"])
     flat = [Decimal(10)] * 16
     rising = [Decimal(10) + Decimal(index) for index in range(16)]
     falling = [Decimal(40) - Decimal(index) for index in range(16)]
-    assert wilder_rsi(flat)[0].value == _oracle_rsi(flat)[0] == Decimal(50)
-    assert wilder_rsi(rising)[0].value == Decimal(100)
-    assert wilder_rsi(falling)[0].value == Decimal(0)
+    assert format(wilder_rsi(flat)[0].value, "f") == expected["flat"]
+    assert format(wilder_rsi(rising)[0].value, "f") == expected["rising"]
+    assert format(wilder_rsi(falling)[0].value, "f") == expected["falling"]
     flat_out = RsiDetector().run(detector_input(_bars_from_closes(flat), crypto_calendar()))
-    assert flat_out.features[0].details["value"] == "50"
+    assert flat_out.features[0].details["value"] == expected["flat"]
+
+
+def test_atr_smoothing_matches_fixture() -> None:
+    """TR is 1 on bars 1..14 and 15 on bar 15. The seed is not the smoothed value."""
+    raw = _load()
+    expected = _string_map(raw["atr_smoothing"])
+    candles = [ohlc(100, high=101, low=100)] * 15
+    candles.append(ohlc(100, high=115, low=100))
+    bars = make_bars(candles, start=utc(2026, 9, 7))
+    points = wilder_atr(bars)
+    assert points[0].index == 14
+    assert format(points[0].value, "f") == expected["index_14"]
+    assert points[1].index == 15
+    assert format(points[1].value, "f") == expected["index_15"]
+    output = AtrDetector().run(detector_input(bars, crypto_calendar()))
+    assert output.features[0].details["value"] == expected["index_14"]
+    assert output.features[1].details["value"] == expected["index_15"]
 
 
 def test_atr_matches_true_range_seed() -> None:

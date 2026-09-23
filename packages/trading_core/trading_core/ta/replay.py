@@ -56,10 +56,15 @@ def incremental_replay(detector: Detector, data: DetectorInput) -> list[ReplaySt
 
 
 def replay_violations(steps: list[ReplayStep]) -> list[str]:
-    """Empty when confirmed events and transitions are a stable, causal log."""
+    """Empty when confirmed events and transitions are a stable, causal log.
+
+    A longer prefix may append rows whose time is the new bar. It may not rewrite a row
+    already logged, and it may not create a row timestamped on an earlier bar.
+    """
     problems: list[str] = []
     seen_events: dict[tuple[object, ...], str] = {}
     seen_transitions: dict[tuple[object, ...], str] = {}
+    previous_as_of: datetime | None = None
     for step in steps:
         current_events: dict[tuple[object, ...], str] = {}
         for event in step.events:
@@ -70,6 +75,13 @@ def replay_violations(steps: list[ReplayStep]) -> list[str]:
             dumped = event.model_dump_json()
             if key in current_events:
                 problems.append(f"duplicate event at {event.origin_time.isoformat()}")
+            elif (
+                key not in seen_events
+                and previous_as_of is not None
+                and event.event_time <= previous_as_of
+            ):
+                stamp = event.origin_time.isoformat()
+                problems.append(f"{event.detector} event at {stamp} was created by a later bar")
             current_events[key] = dumped
         for key, previous in seen_events.items():
             if current_events.get(key) != previous:
@@ -80,12 +92,20 @@ def replay_violations(steps: list[ReplayStep]) -> list[str]:
                 problems.append("transition is after as-of")
             key = transition_identity(item)
             dumped = item.model_dump_json()
+            if (
+                key not in seen_transitions
+                and key not in current_transitions
+                and previous_as_of is not None
+                and item.bar_time <= previous_as_of
+            ):
+                problems.append(f"transition {item.to_state} was created by a later bar")
             current_transitions[key] = dumped
         for key, previous in seen_transitions.items():
             if current_transitions.get(key) != previous:
                 problems.append(f"transition changed: {key[1]} at {key[2]}")
         seen_events = current_events
         seen_transitions = current_transitions
+        previous_as_of = step.as_of
     return problems
 
 
