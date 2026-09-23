@@ -118,7 +118,7 @@ a { color: inherit; }
   flex-direction: column;
   gap: 1.15rem;
   min-height: 0;
-  padding: 1rem 0.7rem 0.85rem;
+  padding: 1rem 0.55rem 0.85rem;
   background: var(--bg-sunken);
   border-right: 1px solid var(--line);
 }
@@ -202,7 +202,7 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  padding: 0.75rem 0.35rem 0.15rem;
+  padding: 0.75rem 0.2rem 0.15rem;
   border-top: 1px solid var(--line);
 }
 
