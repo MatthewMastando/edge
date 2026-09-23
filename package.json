@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=22"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "scripts": {
     "dev": "pnpm --filter @trw/web dev",
     "build": "pnpm --filter @trw/web build",
