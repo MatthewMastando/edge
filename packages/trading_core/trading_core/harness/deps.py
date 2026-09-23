@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from pydantic import Field, JsonValue
@@ -65,6 +65,7 @@ class ResearchPayload(DomainModel):
     horizon: str = Field(default="2-5 sessions", min_length=1, max_length=64)
     recording_id: str | None = None
     owner_id: UUID | None = None
+    tier: Literal["full", "brief"] = "full"
     fixture_features: list[dict[str, JsonValue]] = Field(default_factory=list)
 
 

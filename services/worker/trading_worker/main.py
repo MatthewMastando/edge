@@ -12,8 +12,12 @@ import contextlib
 import logging
 import signal
 import sys
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
+from trading_core.automation.dispatch import dispatch_due, evaluate_triggers
+from trading_core.automation.hypotheses import observe_open
+from trading_core.automation.scan import run_scan
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.harness.deps import WorkflowDeps
 from trading_core.harness.factory import load_detectors, load_model_provider
@@ -60,15 +64,63 @@ class HandlerRegistry:
 
 
 class ResearchJobHandler:
+    def __init__(self, deps: WorkflowDeps, *, kind: JobKind = "research") -> None:
+        self._deps = deps
+        self._kind = kind
+
+    @property
+    def kind(self) -> JobKind:
+        return self._kind
+
+    async def run(self, job: Job) -> None:
+        await run_leased_job(self._deps, job)
+
+
+class TaScanJobHandler:
     def __init__(self, deps: WorkflowDeps) -> None:
         self._deps = deps
 
     @property
     def kind(self) -> JobKind:
-        return "research"
+        return "ta_scan"
 
     async def run(self, job: Job) -> None:
-        await run_leased_job(self._deps, job)
+        await run_scan(self._deps, job)
+        async with self._deps.engine.begin() as conn:
+            await evaluate_triggers(conn, now=datetime.now(UTC))
+
+
+class HypothesisJobHandler:
+    def __init__(self, deps: WorkflowDeps) -> None:
+        self._deps = deps
+
+    @property
+    def kind(self) -> JobKind:
+        return "hypothesis_check"
+
+    async def run(self, job: Job) -> None:
+        try:
+            async with self._deps.engine.begin() as conn:
+                await observe_open(conn, self._deps.adapter)
+                await jobs.set_state(
+                    conn,
+                    job_id=job.id,
+                    worker_id=self._deps.worker_id,
+                    state="completed",
+                    checkpoint={"observed": True},
+                    last_error=None,
+                )
+        except Exception as exc:
+            log.error("hypothesis check %s failed: %s", job.id, exc)
+            async with self._deps.engine.begin() as conn:
+                await jobs.set_state(
+                    conn,
+                    job_id=job.id,
+                    worker_id=self._deps.worker_id,
+                    state="failed",
+                    checkpoint={},
+                    last_error=str(exc)[:500],
+                )
 
 
 class Worker:
@@ -106,6 +158,9 @@ class Worker:
             expired = await jobs.requeue_expired(conn)
             if expired:
                 log.info("requeued %d expired lease(s)", expired)
+            scheduled = await dispatch_due(conn, now=datetime.now(UTC))
+            if scheduled:
+                log.info("enqueued %d automation job(s)", scheduled)
             job = await jobs.lease_next(
                 conn,
                 worker_id=self._settings.effective_worker_id,
@@ -153,6 +208,7 @@ def _limits(settings: WorkerSettings) -> ResearchLimits:
         max_repair_attempts=settings.max_repair_attempts,
         timeout_seconds=settings.timeout_seconds,
         monthly_ai_search_usd=settings.monthly_ai_search_usd,
+        monthly_market_data_usd=settings.monthly_market_data_usd,
         llm_reserve_usd=settings.llm_reserve_usd,
         retrieval_reserve_usd=settings.retrieval_reserve_usd,
     )
@@ -185,6 +241,9 @@ def build_worker(settings: WorkerSettings) -> Worker:
         secrets=secrets_from_environ(),
     )
     registry.register(ResearchJobHandler(deps))
+    registry.register(ResearchJobHandler(deps, kind="scheduled_briefing"))
+    registry.register(TaScanJobHandler(deps))
+    registry.register(HypothesisJobHandler(deps))
     return Worker(settings, registry, database)
 
 

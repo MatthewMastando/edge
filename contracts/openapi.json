@@ -460,6 +460,67 @@
         "title": "BarSeries",
         "type": "object"
       },
+      "BudgetStatus": {
+        "additionalProperties": false,
+        "description": "One monthly ceiling. Market-data spend is never included in the AI/search row.",
+        "properties": {
+          "category": {
+            "enum": [
+              "ai_search",
+              "market_data"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "enforced": {
+            "description": "False when a zero market-data ceiling means record-only.",
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "limit_usd": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Limit Usd",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "spent_usd": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Spent Usd",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "period_start",
+          "limit_usd",
+          "spent_usd",
+          "enforced"
+        ],
+        "title": "BudgetStatus",
+        "type": "object"
+      },
+      "BudgetUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "limit_usd": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Limit Usd",
+            "type": "string"
+          }
+        },
+        "required": [
+          "limit_usd"
+        ],
+        "title": "BudgetUpdate",
+        "type": "object"
+      },
       "Catalyst": {
         "additionalProperties": false,
         "properties": {
@@ -1311,6 +1372,257 @@
           "fixtures_loaded"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "HypothesisObservationView": {
+        "additionalProperties": false,
+        "properties": {
+          "data_revision": {
+            "title": "Data Revision",
+            "type": "string"
+          },
+          "event": {
+            "enum": [
+              "checkpoint",
+              "entry_triggered",
+              "invalidation_hit",
+              "target_hit",
+              "expired"
+            ],
+            "title": "Event",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "observed_tz": {
+            "title": "Observed Tz",
+            "type": "string"
+          },
+          "price": {
+            "description": "Exact decimal encoded as a string (money, prices, sizes).",
+            "format": "decimal",
+            "title": "Price",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "observed_at",
+          "observed_tz",
+          "price",
+          "event",
+          "data_revision"
+        ],
+        "title": "HypothesisObservationView",
+        "type": "object"
+      },
+      "HypothesisOutcome": {
+        "additionalProperties": false,
+        "description": "Frozen thesis plus what price did afterward.\n\n``simulated_pnl`` uses explicit fill, exit and cost assumptions. It is labeled\n``simulated`` and is not a row in imported fills.",
+        "properties": {
+          "artifact_revision_id": {
+            "format": "uuid",
+            "title": "Artifact Revision Id",
+            "type": "string"
+          },
+          "assumptions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Assumptions",
+            "type": "object"
+          },
+          "contract_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Code"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "entry_state": {
+            "enum": [
+              "triggered",
+              "untriggered"
+            ],
+            "title": "Entry State",
+            "type": "string"
+          },
+          "frozen_at": {
+            "format": "date-time",
+            "title": "Frozen At",
+            "type": "string"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "format": "uuid",
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/HypothesisObservationView"
+            },
+            "title": "Observations",
+            "type": "array"
+          },
+          "pnl_label": {
+            "const": "simulated",
+            "default": "simulated",
+            "title": "Pnl Label",
+            "type": "string"
+          },
+          "real_fills_included": {
+            "const": false,
+            "default": false,
+            "title": "Real Fills Included",
+            "type": "boolean"
+          },
+          "simulated_pnl": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulated Pnl"
+          },
+          "simulated_pnl_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulated Pnl Currency"
+          },
+          "stance": {
+            "enum": [
+              "bullish",
+              "bearish",
+              "neutral",
+              "insufficient_evidence"
+            ],
+            "title": "Stance",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "triggered",
+              "invalidated",
+              "target_hit",
+              "expired",
+              "untriggered"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subsequent_move": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subsequent Move"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "description": "Exact decimal encoded as a string (money, prices, sizes).",
+                "format": "decimal",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "id",
+          "artifact_revision_id",
+          "instrument_id",
+          "symbol",
+          "stance",
+          "horizon",
+          "frozen_at",
+          "status",
+          "entry_state"
+        ],
+        "title": "HypothesisOutcome",
         "type": "object"
       },
       "ImportCommitRequest": {
@@ -2938,6 +3250,102 @@
         "title": "ModelResponse",
         "type": "object"
       },
+      "Notification": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "new_research",
+              "material_change",
+              "run_failed",
+              "budget",
+              "source_failure",
+              "import"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "title",
+          "created_at"
+        ],
+        "title": "Notification",
+        "type": "object"
+      },
       "PresetList": {
         "additionalProperties": false,
         "properties": {
@@ -3383,6 +3791,302 @@
           "method"
         ],
         "title": "RollMapEntry",
+        "type": "object"
+      },
+      "Routine": {
+        "additionalProperties": false,
+        "properties": {
+          "cooldown_seconds": {
+            "default": 14400,
+            "minimum": 0.0,
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "crypto_monitoring": {
+            "default": "always",
+            "enum": [
+              "always",
+              "calendar"
+            ],
+            "title": "Crypto Monitoring",
+            "type": "string"
+          },
+          "daily_cap": {
+            "default": 6,
+            "minimum": 0.0,
+            "title": "Daily Cap",
+            "type": "integer"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "event_allowlist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Allowlist",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "scheduled_briefing",
+              "ta_trigger",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "schedule_cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Cron"
+          },
+          "schedule_timezone": {
+            "default": "America/New_York",
+            "title": "Schedule Timezone",
+            "type": "string"
+          },
+          "symbol_by_instrument": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Symbol By Instrument",
+            "type": "object"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "tier": {
+            "default": "brief",
+            "enum": [
+              "full",
+              "brief"
+            ],
+            "title": "Tier",
+            "type": "string"
+          },
+          "timeframe": {
+            "default": "5m",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Routine",
+        "type": "object"
+      },
+      "RoutineCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "cooldown_seconds": {
+            "default": 14400,
+            "minimum": 0.0,
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "crypto_monitoring": {
+            "default": "always",
+            "enum": [
+              "always",
+              "calendar"
+            ],
+            "title": "Crypto Monitoring",
+            "type": "string"
+          },
+          "daily_cap": {
+            "default": 6,
+            "minimum": 0.0,
+            "title": "Daily Cap",
+            "type": "integer"
+          },
+          "event_allowlist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Allowlist",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "scheduled_briefing",
+              "ta_trigger",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "schedule_cron": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Cron"
+          },
+          "schedule_timezone": {
+            "default": "America/New_York",
+            "title": "Schedule Timezone",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Symbols",
+            "type": "array"
+          },
+          "tier": {
+            "default": "brief",
+            "enum": [
+              "full",
+              "brief"
+            ],
+            "title": "Tier",
+            "type": "string"
+          },
+          "timeframe": {
+            "default": "5m",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "symbols"
+        ],
+        "title": "RoutineCreate",
         "type": "object"
       },
       "Run": {
@@ -5755,6 +6459,87 @@
         ]
       }
     },
+    "/v1/budgets": {
+      "get": {
+        "operationId": "listBudgets",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BudgetStatus"
+                  },
+                  "title": "Response Listbudgets",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Budgets",
+        "tags": [
+          "automation"
+        ]
+      }
+    },
+    "/v1/budgets/{category}": {
+      "put": {
+        "operationId": "updateBudget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ai_search",
+                "market_data"
+              ],
+              "title": "Category",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Budget",
+        "tags": [
+          "automation"
+        ]
+      }
+    },
     "/v1/capabilities": {
       "get": {
         "operationId": "getCapabilities",
@@ -6138,6 +6923,145 @@
         "summary": "Get Brief",
         "tags": [
           "kalshi"
+        ]
+      }
+    },
+    "/v1/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  },
+                  "title": "Response Listnotifications",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notifications",
+        "tags": [
+          "automation"
+        ]
+      }
+    },
+    "/v1/outcomes": {
+      "get": {
+        "description": "Frozen hypotheses for Research Outcomes. Simulated P&L is never a real fill.",
+        "operationId": "listOutcomes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HypothesisOutcome"
+                  },
+                  "title": "Response Listoutcomes",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Outcomes",
+        "tags": [
+          "automation"
+        ]
+      }
+    },
+    "/v1/routines": {
+      "get": {
+        "operationId": "listRoutines",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Routine"
+                  },
+                  "title": "Response Listroutines",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Routines",
+        "tags": [
+          "automation"
+        ]
+      },
+      "post": {
+        "operationId": "createRoutine",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Routine"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Routine",
+        "tags": [
+          "automation"
         ]
       }
     },

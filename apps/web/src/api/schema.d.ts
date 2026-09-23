@@ -133,6 +133,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/v1/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Budgets */
+        get: operations["listBudgets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/budgets/{category}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Budget */
+        put: operations["updateBudget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/capabilities": {
         parameters: {
             query?: never;
@@ -297,6 +331,61 @@ export type paths = {
         get: operations["getKalshiEventBrief"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notifications */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Outcomes
+         * @description Frozen hypotheses for Research Outcomes. Simulated P&L is never a real fill.
+         */
+        get: operations["listOutcomes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/routines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Routines */
+        get: operations["listRoutines"];
+        put?: never;
+        /** Create Routine */
+        post: operations["createRoutine"];
         delete?: never;
         options?: never;
         head?: never;
@@ -677,6 +766,48 @@ export type components = {
              * @enum {string}
              */
             timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+        };
+        /**
+         * BudgetStatus
+         * @description One monthly ceiling. Market-data spend is never included in the AI/search row.
+         */
+        BudgetStatus: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "ai_search" | "market_data";
+            /**
+             * Enforced
+             * @description False when a zero market-data ceiling means record-only.
+             */
+            enforced: boolean;
+            /**
+             * Limit Usd
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            limit_usd: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Spent Usd
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            spent_usd: string;
+        };
+        /** BudgetUpdate */
+        BudgetUpdate: {
+            /**
+             * Limit Usd
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            limit_usd: string;
         };
         /** Catalyst */
         Catalyst: {
@@ -1072,6 +1203,116 @@ export type components = {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HypothesisObservationView */
+        HypothesisObservationView: {
+            /** Data Revision */
+            data_revision: string;
+            /**
+             * Event
+             * @enum {string}
+             */
+            event: "checkpoint" | "entry_triggered" | "invalidation_hit" | "target_hit" | "expired";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Observed Tz */
+            observed_tz: string;
+            /**
+             * Price
+             * Format: decimal
+             * @description Exact decimal encoded as a string (money, prices, sizes).
+             */
+            price: string;
+        };
+        /**
+         * HypothesisOutcome
+         * @description Frozen thesis plus what price did afterward.
+         *
+         *     ``simulated_pnl`` uses explicit fill, exit and cost assumptions. It is labeled
+         *     ``simulated`` and is not a row in imported fills.
+         */
+        HypothesisOutcome: {
+            /**
+             * Artifact Revision Id
+             * Format: uuid
+             */
+            artifact_revision_id: string;
+            /** Assumptions */
+            assumptions?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Contract Code */
+            contract_code?: string | null;
+            /** Entry */
+            entry?: string | null;
+            /**
+             * Entry State
+             * @enum {string}
+             */
+            entry_state: "triggered" | "untriggered";
+            /**
+             * Frozen At
+             * Format: date-time
+             */
+            frozen_at: string;
+            /** Horizon */
+            horizon: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Instrument Id
+             * Format: uuid
+             */
+            instrument_id: string;
+            /** Invalidation */
+            invalidation?: string | null;
+            /** Observations */
+            observations?: components["schemas"]["HypothesisObservationView"][];
+            /**
+             * Pnl Label
+             * @default simulated
+             * @constant
+             */
+            pnl_label: "simulated";
+            /**
+             * Real Fills Included
+             * @default false
+             * @constant
+             */
+            real_fills_included: false;
+            /** Simulated Pnl */
+            simulated_pnl?: string | null;
+            /** Simulated Pnl Currency */
+            simulated_pnl_currency?: string | null;
+            /**
+             * Stance
+             * @enum {string}
+             */
+            stance: "bullish" | "bearish" | "neutral" | "insufficient_evidence";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "triggered" | "invalidated" | "target_hit" | "expired" | "untriggered";
+            /** Subsequent Move */
+            subsequent_move?: string | null;
+            /** Symbol */
+            symbol: string;
+            /** Target */
+            target?: string | null;
         };
         /** ImportCommitRequest */
         ImportCommitRequest: {
@@ -1775,6 +2016,39 @@ export type components = {
             tool_calls?: components["schemas"]["ToolCall"][];
             usage: components["schemas"]["Usage"];
         };
+        /** Notification */
+        Notification: {
+            /** Artifact Id */
+            artifact_id?: string | null;
+            /** Body */
+            body?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_research" | "material_change" | "run_failed" | "budget" | "source_failure" | "import";
+            /** Read At */
+            read_at?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error";
+            /** Title */
+            title: string;
+        };
         /** PresetList */
         PresetList: {
             /** Presets */
@@ -1976,6 +2250,140 @@ export type components = {
             root: string;
             /** To Contract Code */
             to_contract_code: string;
+        };
+        /** Routine */
+        Routine: {
+            /**
+             * Cooldown Seconds
+             * @default 14400
+             */
+            cooldown_seconds: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Crypto Monitoring
+             * @default always
+             * @enum {string}
+             */
+            crypto_monitoring: "always" | "calendar";
+            /**
+             * Daily Cap
+             * @default 6
+             */
+            daily_cap: number;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Event Allowlist */
+            event_allowlist?: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instrument Ids */
+            instrument_ids?: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "scheduled_briefing" | "ta_trigger" | "manual";
+            /** Last Run At */
+            last_run_at?: string | null;
+            /** Name */
+            name: string;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /** Owner Id */
+            owner_id?: string | null;
+            /** Question */
+            question?: string | null;
+            /** Schedule Cron */
+            schedule_cron?: string | null;
+            /**
+             * Schedule Timezone
+             * @default America/New_York
+             */
+            schedule_timezone: string;
+            /** Symbol By Instrument */
+            symbol_by_instrument?: {
+                [key: string]: string;
+            };
+            /** Symbols */
+            symbols?: string[];
+            /**
+             * Tier
+             * @default brief
+             * @enum {string}
+             */
+            tier: "full" | "brief";
+            /**
+             * Timeframe
+             * @default 5m
+             * @enum {string}
+             */
+            timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** RoutineCreate */
+        RoutineCreate: {
+            /**
+             * Cooldown Seconds
+             * @default 14400
+             */
+            cooldown_seconds: number;
+            /**
+             * Crypto Monitoring
+             * @default always
+             * @enum {string}
+             */
+            crypto_monitoring: "always" | "calendar";
+            /**
+             * Daily Cap
+             * @default 6
+             */
+            daily_cap: number;
+            /** Event Allowlist */
+            event_allowlist?: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "scheduled_briefing" | "ta_trigger" | "manual";
+            /** Name */
+            name: string;
+            /** Question */
+            question?: string | null;
+            /** Schedule Cron */
+            schedule_cron?: string | null;
+            /**
+             * Schedule Timezone
+             * @default America/New_York
+             */
+            schedule_timezone: string;
+            /** Symbols */
+            symbols: string[];
+            /**
+             * Tier
+             * @default brief
+             * @enum {string}
+             */
+            tier: "full" | "brief";
+            /**
+             * Timeframe
+             * @default 5m
+             * @enum {string}
+             */
+            timeframe: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
         };
         /**
          * Run
@@ -3155,6 +3563,61 @@ export interface operations {
             };
         };
     };
+    listBudgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetStatus"][];
+                };
+            };
+        };
+    };
+    updateBudget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: "ai_search" | "market_data";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BudgetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BudgetStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     getCapabilities: {
         parameters: {
             query?: never;
@@ -3429,6 +3892,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KalshiEventBrief"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listOutcomes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HypothesisOutcome"][];
+                };
+            };
+        };
+    };
+    listRoutines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Routine"][];
+                };
+            };
+        };
+    };
+    createRoutine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoutineCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Routine"];
                 };
             };
             /** @description Validation Error */
