@@ -10,13 +10,15 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
+from pydantic import ValidationError
+
 from trading_core.automation.rules import market_is_open, trigger_decision
 from trading_core.automation.schedule import ScheduleError, local_midnight, next_occurrence
 from trading_core.domain.instruments import SessionCalendar
 from trading_core.harness.deps import ResearchPayload
 from trading_core.storage.repositories import automation as store
 from trading_core.storage.repositories import jobs
-from trading_core.storage.repositories.common import as_datetime, as_str, as_uuid
+from trading_core.storage.repositories.common import as_datetime, as_json_dict, as_str, as_uuid
 
 if TYPE_CHECKING:
     from pydantic import JsonValue
@@ -26,6 +28,7 @@ if TYPE_CHECKING:
     from trading_core.domain.jobs import Job, JobKind
 
 _SCAN_GAP = timedelta(minutes=15)
+_EVENT_PAGE = 200
 
 
 async def dispatch_due(conn: AsyncConnection, *, now: datetime) -> int:
@@ -62,9 +65,28 @@ async def _evaluate_routine(conn: AsyncConnection, routine: Routine, now: dateti
     enqueued_today = await store.count_enqueued_since(conn, routine_id=routine.id, start=start)
     allowlist = set(routine.event_allowlist)
     created = 0
-    events = await store.events_without_decision(
-        conn, routine_id=routine.id, instrument_ids=routine.instrument_ids
-    )
+    while True:
+        events = await store.events_without_decision(
+            conn, routine_id=routine.id, instrument_ids=routine.instrument_ids
+        )
+        if not events:
+            break
+        created += await _decide_events(conn, routine, events, allowlist, enqueued_today, now)
+        enqueued_today = await store.count_enqueued_since(conn, routine_id=routine.id, start=start)
+        if len(events) < _EVENT_PAGE:
+            break
+    return created
+
+
+async def _decide_events(
+    conn: AsyncConnection,
+    routine: Routine,
+    events: list[dict[str, object]],
+    allowlist: set[str],
+    enqueued_today: int,
+    now: datetime,
+) -> int:
+    created = 0
     for event in events:
         confirmation = as_datetime(event["event_time"])
         instrument_id = as_uuid(event["instrument_id"])
@@ -131,9 +153,8 @@ async def _enqueue_briefings(conn: AsyncConnection, routine: Routine, slot: date
 
 
 async def _enqueue_scan(conn: AsyncConnection, routine: Routine, now: datetime) -> int:
-    symbols = [
-        symbol for symbol in routine.symbols if await _symbol_open(conn, routine, symbol, now)
-    ]
+    """Record every symbol. Market hours gate the research job, not the TA log."""
+    symbols = list(routine.symbols)
     if not symbols:
         return 0
     payload = cast(
@@ -182,6 +203,8 @@ async def _research_job(
     kind: JobKind = "research",
 ) -> Job:
     question = routine.question or f"What changed for {symbol}?"
+    # TA triggers stay on the brief tier so a confirmed event cannot start web retrieval.
+    tier = "brief" if routine.kind == "ta_trigger" else routine.tier
     payload = cast(
         "dict[str, JsonValue]",
         ResearchPayload(
@@ -189,7 +212,7 @@ async def _research_job(
             question=question,
             timeframe=routine.timeframe,
             owner_id=routine.owner_id,
-            tier=routine.tier,
+            tier=tier,
         ).model_dump(mode="json"),
     )
     return await jobs.enqueue_job(
@@ -219,10 +242,10 @@ async def _event_market_open(
     row = await store.instrument_context(conn, instrument_id)
     if row is None or row.get("definition") is None:
         return False
-    definition = row["definition"]
-    if isinstance(definition, str):
+    try:
+        calendar = SessionCalendar.model_validate(as_json_dict(row["definition"]))
+    except (TypeError, ValidationError):
         return False
-    calendar = SessionCalendar.model_validate(definition)
     return market_is_open(
         calendar,
         when,

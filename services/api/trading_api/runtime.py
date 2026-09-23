@@ -20,6 +20,7 @@ def research_limits(settings: ApiSettings) -> ResearchLimits:
         max_repair_attempts=settings.max_repair_attempts,
         timeout_seconds=settings.timeout_seconds,
         monthly_ai_search_usd=settings.monthly_ai_search_usd,
+        monthly_market_data_usd=settings.monthly_market_data_usd,
         llm_reserve_usd=settings.llm_reserve_usd,
         retrieval_reserve_usd=settings.retrieval_reserve_usd,
     )

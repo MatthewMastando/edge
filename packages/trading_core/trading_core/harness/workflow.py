@@ -779,7 +779,7 @@ class ResearchWorkflow:
                 "validation_passed": result.passed,
                 "repair_attempted": True,
                 "partial_research": checkpoint.partial_research or partial,
-                "stop_reason": checkpoint.stop_reason if result.passed else "validation",
+                "stop_reason": checkpoint.stop_reason or (None if result.passed else "validation"),
             }
         )
 

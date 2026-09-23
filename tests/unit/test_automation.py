@@ -253,6 +253,30 @@ def test_price_path_freezes_entry_invalidation_and_simulated_exit() -> None:
     assert events == ["entry_triggered", "invalidation_hit", "checkpoint"]
 
 
+def test_invalidation_blocks_a_later_entry() -> None:
+    start = datetime(2026, 8, 31, 14, 0, tzinfo=UTC)
+    path = apply_price_path(
+        stance="bullish",
+        entry=Decimal("10"),
+        invalidation=Decimal("9"),
+        target=Decimal("20"),
+        frozen_at=start,
+        status="open",
+        entry_state="untriggered",
+        bars=[
+            _bar(start, low="8", high="8.5", close="8"),
+            _bar(start + timedelta(minutes=5), low="9", high="11", close="10"),
+        ],
+        multiplier=Decimal("1"),
+        cost=Decimal("0"),
+        data_revision="rev",
+    )
+    assert path.entry_state == "untriggered"
+    assert path.status == "invalidated"
+    assert path.simulated_pnl is None
+    assert [item[0] for item in path.observations] == ["invalidation_hit", "checkpoint"]
+
+
 def test_untriggered_path_has_no_simulated_pnl() -> None:
     start = datetime(2026, 8, 31, 14, 0, tzinfo=UTC)
     bars = [

@@ -115,6 +115,8 @@ def _apply_bar(
     target: Decimal | None,
     data_revision: str,
 ) -> None:
+    if result.status in _TERMINAL:
+        return
     if entry is not None and result.entry_state == "untriggered" and bar.low <= entry <= bar.high:
         result.entry_state = "triggered"
         if result.status == "open":
@@ -122,8 +124,6 @@ def _apply_bar(
         result.observations.append(
             ("entry_triggered", bar.origin_time, bar.origin_tz, entry, data_revision)
         )
-    if result.status in _TERMINAL:
-        return
     if invalidation is not None and _invalidated(stance, bar.close, invalidation):
         result.status = "invalidated"
         result.observations.append(
