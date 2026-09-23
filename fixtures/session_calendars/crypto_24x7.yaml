@@ -1,0 +1,14 @@
+id: crypto_24x7
+name: "Spot crypto — continuous"
+version: "1.0.0"
+timezone: UTC
+exchange_calendar_code: null
+trading_days: [mon, tue, wed, thu, fri, sat, sun]
+always_open: true
+windows:
+  - name: utc_day
+    open_time: "00:00:00"
+    close_time: "00:00:00"
+    kind: trading
+holidays: []
+notes: "A 'session' for crypto is the UTC day; monitoring is configured separately from exchange calendars."

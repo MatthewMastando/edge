@@ -1,0 +1,21 @@
+id: nymex_globex_energy
+name: "NYMEX (CME Globex) — energy futures"
+version: "1.0.0"
+timezone: America/Chicago
+exchange_calendar_code: CMES
+trading_days: [mon, tue, wed, thu, fri]
+windows:
+  - name: globex
+    open_time: "17:00:00"
+    close_time: "16:00:00"
+    opens_previous_day: true
+    kind: trading
+  - name: maintenance_break
+    open_time: "16:00:00"
+    close_time: "17:00:00"
+    kind: break
+  - name: settlement
+    open_time: "13:28:00"
+    close_time: "13:30:00"
+    kind: settlement_window
+holidays: []

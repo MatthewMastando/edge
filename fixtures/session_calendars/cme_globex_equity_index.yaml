@@ -1,0 +1,26 @@
+id: cme_globex_equity_index
+name: "CME Globex — equity index futures"
+version: "1.0.0"
+timezone: America/Chicago
+exchange_calendar_code: CMES
+trading_days: [mon, tue, wed, thu, fri]
+windows:
+  - name: globex
+    open_time: "17:00:00"
+    close_time: "16:00:00"
+    opens_previous_day: true
+    kind: trading
+  - name: rth
+    open_time: "08:30:00"
+    close_time: "15:15:00"
+    kind: sub_session
+  - name: maintenance_break
+    open_time: "16:00:00"
+    close_time: "17:00:00"
+    kind: break
+  - name: settlement
+    open_time: "14:59:30"
+    close_time: "15:00:00"
+    kind: settlement_window
+holidays: []
+notes: "rth is a sub-window of globex used for session levels (PDH/PDL); it does not add bars."
