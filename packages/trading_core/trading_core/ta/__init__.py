@@ -1,14 +1,11 @@
-"""Deterministic TA interfaces. Detector implementations are Stage 1A (Worker A).
+"""Deterministic technical analysis, calc version 1.0.0.
 
-Contract every detector must honour (spec section 5):
-
-- operate on completed bars only; a pivot at ``i`` becomes known at ``i+3``;
-- store origin and confirmation separately;
-- reject inadequate warm-up and missing data instead of guessing;
-- emit :class:`~trading_core.domain.ta.TAFeature` objects stamped with ``calc_version`` and the
-  ``data_revision`` of the snapshot they ran on.
+Charts, reports, alerts and replay share :class:`~trading_core.domain.ta.TAFeature` objects
+produced by the detectors in :mod:`trading_core.ta.detectors`.
 """
 
+from trading_core.ta.constants import CALC_VERSION
+from trading_core.ta.detectors import default_registry
 from trading_core.ta.interfaces import (
     Detector,
     DetectorInput,
@@ -16,11 +13,17 @@ from trading_core.ta.interfaces import (
     DetectorRegistry,
     InsufficientDataError,
 )
+from trading_core.ta.replay import ReplayStep, incremental_replay, replay_violations
 
 __all__ = [
+    "CALC_VERSION",
     "Detector",
     "DetectorInput",
     "DetectorOutput",
     "DetectorRegistry",
     "InsufficientDataError",
+    "ReplayStep",
+    "default_registry",
+    "incremental_replay",
+    "replay_violations",
 ]
