@@ -1,2 +1,1 @@
-"""HTTP routes. Stage 0 exposes health plus read-only fixture market data; Stage 1B adds chat,
-runs, artifacts and revisions."""
+"""HTTP routes: health, fixture market data, chat, runs, artifacts and search."""

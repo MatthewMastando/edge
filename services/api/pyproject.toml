@@ -10,6 +10,7 @@ dependencies = [
     "pydantic-settings>=2.10",
     "sqlalchemy[asyncio]>=2.0.40",
     "asyncpg>=0.30",
+    "pyjwt>=2.10",
 ]
 
 [project.scripts]

@@ -11,9 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from trading_api import __version__
 from trading_api.openapi_schema import build_openapi
-from trading_api.routes import health, market
+from trading_api.routes import artifacts, chat, health, market, runs, search
 from trading_api.settings import ApiSettings, get_settings
 from trading_core.data.fixture import FixtureAdapter
+from trading_core.storage.db import Database
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -44,9 +45,14 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.info("starting trading-api %s with %s", __version__, settings.redacted)
+        database = Database(settings.database_url)
         app.state.settings = settings
+        app.state.database = database
         app.state.fixture_adapter = load_fixture_adapter(settings)
-        yield
+        try:
+            yield
+        finally:
+            await database.dispose()
 
     app = FastAPI(
         title="Trading Research Workspace API",
@@ -64,6 +70,10 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(market.router)
+    app.include_router(chat.router)
+    app.include_router(runs.router)
+    app.include_router(artifacts.router)
+    app.include_router(search.router)
 
     def custom_openapi() -> dict[str, Any]:
         if app.openapi_schema is None:
