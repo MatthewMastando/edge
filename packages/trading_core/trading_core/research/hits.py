@@ -40,6 +40,7 @@ def failure_hit(
     retrieved_at: datetime,
     publisher: str,
     provenance: Provenance = "live",
+    external: bool = False,
 ) -> ResearchHit:
     return ResearchHit(
         kind=kind,
@@ -51,5 +52,5 @@ def failure_hit(
         retrieved_at=retrieved_at,
         status="failed" if exc.status == "missing_credential" else exc.status,
         error=exc.reason,
-        external=False,
+        external=external,
     )

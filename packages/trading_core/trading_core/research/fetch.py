@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
@@ -10,7 +11,13 @@ from trading_core.http_client import HttpRequest
 from trading_core.labeling import FeedLabel, SourceFailure
 from trading_core.research.html_text import html_to_text
 from trading_core.research.interfaces import FetchedDocument
-from trading_core.research.ssrf import AddressBlockedError, Resolver, check_url, default_resolver
+from trading_core.research.ssrf import (
+    AddressBlockedError,
+    Resolver,
+    default_resolver,
+    inspect_url,
+    require_public,
+)
 
 if TYPE_CHECKING:
     from trading_core.http_client import Transport
@@ -45,7 +52,7 @@ class SafeFetcher:
     async def fetch(self, url: str) -> FetchedDocument:
         current = url
         for _hop in range(self._max_redirects + 1):
-            self._permit(current)
+            pinned = await self._pin(current)
             result = await self._transport.send(
                 HttpRequest(
                     method="GET",
@@ -55,6 +62,8 @@ class SafeFetcher:
                         "User-Agent": "trading-research-workspace",
                     },
                     timeout_seconds=self._timeout,
+                    max_bytes=self._max_bytes,
+                    pinned_ip=pinned,
                 )
             )
             location = result.headers.get("location")
@@ -68,8 +77,11 @@ class SafeFetcher:
                     delay=_LABEL.delay,
                     reason=f"HTTP {result.status}",
                 )
-            body = result.body[: self._max_bytes]
-            truncated = len(result.body) > self._max_bytes
+            body = result.body
+            truncated = result.truncated
+            if len(body) > self._max_bytes:
+                body = body[: self._max_bytes]
+                truncated = True
             text_body = body.decode("utf-8", errors="replace")
             content_type = result.headers.get("content-type", "")
             if "html" in content_type or text_body.lstrip().startswith("<"):
@@ -96,18 +108,13 @@ class SafeFetcher:
             reason="too many redirects",
         )
 
-    def _permit(self, url: str) -> None:
+    async def _pin(self, url: str) -> str:
+        """Resolve once, reject non-public answers, and return the address to connect to."""
         try:
-            host = check_url(url, self._resolver)
+            prepared = inspect_url(url)
         except AddressBlockedError as exc:
-            raise SourceFailure(
-                source="fetch",
-                coverage="request blocked before any connection",
-                delay="not requested",
-                reason=str(exc),
-                status="failed",
-            ) from exc
-        refusal = self._policy.refusal(host)
+            raise self._blocked(exc) from exc
+        refusal = self._policy.refusal(prepared.host)
         if refusal is not None:
             raise SourceFailure(
                 source="fetch",
@@ -116,3 +123,40 @@ class SafeFetcher:
                 reason=refusal,
                 status="failed",
             )
+        if prepared.literal is not None:
+            return str(prepared.literal)
+        try:
+            addresses = await asyncio.wait_for(
+                asyncio.to_thread(self._resolver, prepared.host, prepared.port),
+                timeout=self._timeout,
+            )
+        except TimeoutError as exc:
+            raise SourceFailure(
+                source="fetch",
+                coverage="name resolution exceeded the fetch time limit",
+                delay="not requested",
+                reason="name resolution timed out",
+                status="failed",
+            ) from exc
+        except OSError as exc:
+            raise SourceFailure(
+                source="fetch",
+                coverage="name resolution failed",
+                delay="not requested",
+                reason="name resolution failed",
+                status="failed",
+            ) from exc
+        try:
+            require_public(prepared.host, addresses)
+        except AddressBlockedError as exc:
+            raise self._blocked(exc) from exc
+        return str(addresses[0])
+
+    def _blocked(self, exc: AddressBlockedError) -> SourceFailure:
+        return SourceFailure(
+            source="fetch",
+            coverage="request blocked before any connection",
+            delay="not requested",
+            reason=str(exc),
+            status="failed",
+        )

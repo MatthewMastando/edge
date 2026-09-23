@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from trading_core.labeling import FeedLabel, SourceFailure
+from trading_core.labeling import FeedLabel, SourceFailure, request_was_sent
 from trading_core.research.hits import ResearchHit, failure_hit
 from trading_core.research.official import (
     CalendarSource,
@@ -19,7 +19,7 @@ from trading_core.research.official import (
 if TYPE_CHECKING:
     from trading_core.domain.common import Provenance
     from trading_core.research.fetch import SafeFetcher
-    from trading_core.research.interfaces import SearchProvider
+    from trading_core.research.interfaces import SearchProvider, SourceKind
 
 _AG = {"ZC": "CORN", "ZS": "SOYBEANS", "ZW": "WHEAT", "KE": "WHEAT", "ZM": "SOYBEANS"}
 _MAX_GATHER = 3
@@ -52,7 +52,19 @@ class ResearchServices:
             rows = await self.search.search(query, max_results=max_results)
         except SourceFailure as exc:
             now = _now()
-            return [failure_hit("web_search", exc, retrieved_at=now, publisher=self.search.name)], 0
+            sent = request_was_sent(exc)
+            return (
+                [
+                    failure_hit(
+                        "web_search",
+                        exc,
+                        retrieved_at=now,
+                        publisher=self.search.name,
+                        external=sent,
+                    )
+                ],
+                1 if sent else 0,
+            )
         external = 0 if self.search.name == "fixture" else 1
         hits = [
             ResearchHit(
@@ -71,12 +83,33 @@ class ResearchServices:
         return hits, external
 
     async def gather(
-        self, *, symbol: str, asset_class: str, question: str
+        self,
+        *,
+        symbol: str,
+        asset_class: str,
+        question: str,
+        retrieval_budget: int = _MAX_GATHER,
     ) -> tuple[list[ResearchHit], int]:
-        hits, external = await self.search_hits(f"{symbol} {question}"[:300], max_results=3)
+        """Gather context without exceeding the run's remaining retrieval budget.
+
+        Coverage-gap notes are still returned when a live call is skipped.
+        """
+        cap = min(_MAX_GATHER, max(0, retrieval_budget))
+        hits: list[ResearchHit] = []
+        external = 0
+        if cap > 0:
+            found, used = await self.search_hits(f"{symbol} {question}"[:300], max_results=3)
+            hits.extend(found)
+            external += used
+        else:
+            hits.append(_skipped("web_search", "web search"))
         for kind, reference in _plan(symbol, asset_class):
-            if external >= _MAX_GATHER:
-                break
+            if kind == "gap":
+                hits.append(gap_hit(source="research", coverage=reference, reason=reference))
+                continue
+            if external >= cap:
+                hits.append(_skipped(kind, reference))
+                continue
             hit = await self._one(kind, reference)
             hits.append(hit)
             if hit.external:
@@ -110,6 +143,38 @@ class ResearchServices:
                 publisher="research",
             )
         return hit
+
+
+def _skipped(kind: str, reference: str) -> ResearchHit:
+    return ResearchHit(
+        kind=_source_kind(kind),
+        label=FeedLabel(
+            source=kind,
+            coverage=f"{kind} {reference} was not requested because the retrieval cap was reached",
+            delay="not requested",
+            provenance="live",
+        ),
+        title=f"{kind} not retrieved",
+        text="external retrieval cap reached; no value was invented",
+        publisher=kind,
+        retrieved_at=_now(),
+        status="missing_coverage",
+        error="external retrieval cap reached; no value was invented",
+        external=False,
+    )
+
+
+def _source_kind(kind: str) -> SourceKind:
+    kinds: dict[str, SourceKind] = {
+        "fred": "fred",
+        "eia": "eia",
+        "usda": "usda",
+        "sec_filing": "sec_filing",
+        "central_bank_calendar": "central_bank_calendar",
+        "web_search": "web_search",
+        "web_page": "web_page",
+    }
+    return kinds.get(kind, "release_calendar")
 
 
 def _plan(symbol: str, asset_class: str) -> list[tuple[str, str]]:

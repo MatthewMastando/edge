@@ -564,10 +564,12 @@ class ResearchWorkflow:
             unit_type="calls",
         )
         try:
+            remaining = self._deps.limits.max_external_retrievals - checkpoint.retrievals_used
             hits, external = await research.gather(
                 symbol=payload.symbol,
                 asset_class=checkpoint.asset_class or "",
                 question=payload.question,
+                retrieval_budget=remaining,
             )
             source_ids: list[UUID] = []
             excerpt_ids: list[UUID] = []

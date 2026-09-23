@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from trading_core.http_client import HttpRequest, query_url
-from trading_core.labeling import FeedLabel, SourceFailure, missing_credential
+from trading_core.labeling import FeedLabel, SourceFailure, missing_credential, request_was_sent
 from trading_core.research.hits import ResearchHit, failure_hit
 from trading_core.research.interfaces import SourceExcerpt
 
@@ -45,6 +46,9 @@ _WASDE = (
     "USDA WASDE has no report-text API in this build. "
     "QuickStats is not a substitute, and crop-report prose is missing coverage."
 )
+# SEC fair-access is 10 requests/second. 0.12s leaves headroom for two calls in one lookup.
+SEC_MIN_INTERVAL_SECONDS = 0.12
+_MISSING_VALUES = {"", ".", "nan", "null", "none"}
 
 
 class _Pace:
@@ -98,37 +102,26 @@ class FredSource:
         try:
             payload = await _json_get(self._transport, url, source="fred", headers={})
         except SourceFailure as exc:
-            return failure_hit("fred", exc, retrieved_at=now, publisher="FRED")
+            return failure_hit(
+                "fred", exc, retrieved_at=now, publisher="FRED", external=request_was_sent(exc)
+            )
         observations = payload.get("observations")
-        if not isinstance(observations, list) or not observations:
+        published = _latest_published(observations)
+        if published is None:
             return failure_hit(
                 "fred",
                 SourceFailure(
                     source="fred",
-                    coverage=f"FRED series {series_id} returned no observations",
+                    coverage=f"FRED series {series_id} returned no published observation",
                     delay="FRED publication lag is series-specific and was not assumed",
                     reason="missing observations are not zero",
                     status="missing_coverage",
                 ),
                 retrieved_at=now,
                 publisher="FRED",
+                external=True,
             )
-        latest = observations[0]
-        if not isinstance(latest, dict):
-            return failure_hit(
-                "fred",
-                SourceFailure(
-                    source="fred",
-                    coverage=f"FRED series {series_id} observation was not an object",
-                    delay="FRED publication lag is series-specific and was not assumed",
-                    reason="observation shape was not assumed",
-                    status="missing_coverage",
-                ),
-                retrieved_at=now,
-                publisher="FRED",
-            )
-        value = latest.get("value")
-        date = latest.get("date")
+        date, value = published
         text = f"FRED {series_id} observation date {date} value {value}."
         return ResearchHit(
             kind="fred",
@@ -174,24 +167,28 @@ class EiaSource:
         try:
             payload = await _json_get(self._transport, url, source="eia", headers={})
         except SourceFailure as exc:
-            return failure_hit("eia", exc, retrieved_at=now, publisher="EIA")
+            return failure_hit(
+                "eia", exc, retrieved_at=now, publisher="EIA", external=request_was_sent(exc)
+            )
         response = payload.get("response")
         data = response.get("data") if isinstance(response, dict) else None
-        if not isinstance(data, list) or not data:
+        row = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else None
+        value = _published(row.get("value")) if isinstance(row, dict) else None
+        if not isinstance(row, dict) or value is None:
             return failure_hit(
                 "eia",
                 SourceFailure(
                     source="eia",
-                    coverage=f"EIA series {series_id} returned no data",
+                    coverage=f"EIA series {series_id} returned no published value",
                     delay="weekly or monthly, depending on the series; not assumed",
                     reason="missing inventory data is not zero",
                     status="missing_coverage",
                 ),
                 retrieved_at=now,
                 publisher="EIA",
+                external=True,
             )
-        row = data[0] if isinstance(data[0], dict) else {}
-        text = f"EIA {series_id} period {row.get('period')} value {row.get('value')}."
+        text = f"EIA {series_id} period {row.get('period')} value {value}."
         return ResearchHit(
             kind="eia",
             label=FeedLabel(
@@ -244,25 +241,32 @@ class NassSource:
         try:
             payload = await _json_get(self._transport, url, source="nass", headers={})
         except SourceFailure as exc:
-            return failure_hit("usda", exc, retrieved_at=now, publisher="USDA NASS")
+            return failure_hit(
+                "usda", exc, retrieved_at=now, publisher="USDA NASS", external=request_was_sent(exc)
+            )
         rows = payload.get("data")
-        if not isinstance(rows, list) or not rows:
+        first = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else None
+        value = _published(first.get("Value")) if isinstance(first, dict) else None
+        if not isinstance(first, dict) or value is None:
             error = payload.get("error")
             return failure_hit(
                 "usda",
                 SourceFailure(
                     source="nass",
-                    coverage=f"QuickStats returned no production rows for {commodity}. {_WASDE}",
+                    coverage=(
+                        "QuickStats returned no published production value for "
+                        f"{commodity}. {_WASDE}"
+                    ),
                     delay="survey release lag was not assumed",
-                    reason=str(error) if error else "no rows",
+                    reason=str(error) if error else "no published value; missing data is not zero",
                     status="missing_coverage",
                 ),
                 retrieved_at=now,
                 publisher="USDA NASS",
+                external=True,
             )
-        first = rows[0] if isinstance(rows[0], dict) else {}
         text = (
-            f"NASS QuickStats {commodity} {first.get('year')} {first.get('Value')} "
+            f"NASS QuickStats {commodity} {first.get('year')} {value} "
             f"{first.get('unit_desc')}. {_WASDE}"
         )
         return ResearchHit(
@@ -286,7 +290,11 @@ class SecSource:
     kind = "sec_filing"
 
     def __init__(
-        self, *, user_agent: str, transport: Transport, min_interval: float = 0.12
+        self,
+        *,
+        user_agent: str,
+        transport: Transport,
+        min_interval: float = SEC_MIN_INTERVAL_SECONDS,
     ) -> None:
         self._user_agent = user_agent.strip()
         self._transport = transport
@@ -331,7 +339,13 @@ class SecSource:
                 headers=headers,
             )
         except SourceFailure as exc:
-            return failure_hit("sec_filing", exc, retrieved_at=now, publisher="SEC EDGAR")
+            return failure_hit(
+                "sec_filing",
+                exc,
+                retrieved_at=now,
+                publisher="SEC EDGAR",
+                external=request_was_sent(exc),
+            )
         recent = submissions.get("filings")
         forms = ""
         if isinstance(recent, dict):
@@ -398,8 +412,23 @@ class CalendarSource:
                 exc,
                 retrieved_at=now,
                 publisher=name,
+                external=request_was_sent(exc),
             )
-        text = document.text[:1500] or "calendar page returned no text"
+        text = document.text[:1500].strip()
+        if not text:
+            return failure_hit(
+                "central_bank_calendar",
+                SourceFailure(
+                    source="central_bank_calendar",
+                    coverage=f"{name} page returned no calendar text",
+                    delay="page retrieval time; dates were not inferred",
+                    reason="empty calendar text is missing coverage, not an empty schedule",
+                    status="missing_coverage",
+                ),
+                retrieved_at=document.retrieved_at,
+                publisher=name,
+                external=True,
+            )
         return ResearchHit(
             kind="central_bank_calendar",
             label=FeedLabel(
@@ -452,6 +481,34 @@ def _excerpt(hit: ResearchHit) -> SourceExcerpt:
         coverage=hit.label.coverage,
         delay=hit.label.delay,
     )
+
+
+def _published(raw: object) -> str | None:
+    """Return a vendor value only when one was published. Missing markers are not zero."""
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, int):
+        return str(raw)
+    if isinstance(raw, float):
+        return None if not math.isfinite(raw) else str(raw)
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    return None if text.lower() in _MISSING_VALUES else text
+
+
+def _latest_published(observations: object) -> tuple[str, str] | None:
+    if not isinstance(observations, list):
+        return None
+    for item in observations:
+        if not isinstance(item, dict):
+            continue
+        value = _published(item.get("value"))
+        date = item.get("date")
+        if value is None or not isinstance(date, str) or not date.strip():
+            continue
+        return date, value
+    return None
 
 
 def _cik_for(payload: dict[str, object], ticker: str) -> str | None:

@@ -235,7 +235,14 @@ def _coinbase(transport: RecordingTransport) -> CoinbaseAdapter:
     )
 
 
-async def test_coinbase_cassette_keeps_venue_base_and_quote() -> None:
+async def test_coinbase_cassette_keeps_venue_base_and_quote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _network(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("coinbase cassette touched the network")
+
+    monkeypatch.setattr("socket.getaddrinfo", _network)
+    monkeypatch.setattr("socket.create_connection", _network)
     transport = RecordingTransport()
     adapter = _coinbase(transport)
     listed = await adapter.list_instruments()

@@ -51,6 +51,11 @@ class SourceFailure(RuntimeError):  # noqa: N818 — status vocabulary, not a ge
         )
 
 
+def request_was_sent(failure: SourceFailure) -> bool:
+    """True when the failure happened after a request left this process."""
+    return failure.status != "missing_credential" and failure.delay != "not requested"
+
+
 def missing_credential(source: str, env_name: str, *, coverage: str) -> SourceFailure:
     return SourceFailure(
         source=source,

@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from trading_core.http_client import HttpRequest
 from trading_core.labeling import SourceFailure, missing_credential
 from trading_core.research.interfaces import SearchResult
+from trading_core.research.ssrf import static_block_reason
 
 if TYPE_CHECKING:
     from trading_core.http_client import Transport
@@ -62,13 +64,15 @@ class TavilySearchProvider:
                 "TAVILY_API_KEY",
                 coverage="web search was not requested",
             )
-        payload = {
+        payload: dict[str, object] = {
             "api_key": self._api_key,
             "query": query[:300],
             "max_results": max(1, min(max_results, 5)),
-            "include_domains": list(self._policy.allow),
-            "exclude_domains": list(self._policy.deny),
         }
+        if self._policy.allow:
+            payload["include_domains"] = list(self._policy.allow)
+        if self._policy.deny:
+            payload["exclude_domains"] = list(self._policy.deny)
         result = await self._transport.send(
             HttpRequest(
                 method="POST",
@@ -88,7 +92,25 @@ class TavilySearchProvider:
                 delay="request time",
                 reason=f"HTTP {result.status}",
             )
-        return _results(result.body)
+        found = _results(result.body)
+        kept = [row for row in found if self._keeps(row.url)]
+        if found and not kept:
+            raise SourceFailure(
+                source="tavily",
+                coverage=(
+                    "search results were outside the domain policy or used a non-public address"
+                ),
+                delay="search response was not stored",
+                reason="blocked results were dropped and not replaced",
+                status="missing_coverage",
+            )
+        return kept
+
+    def _keeps(self, url: str) -> bool:
+        if static_block_reason(url) is not None:
+            return False
+        host = urlparse(url).hostname or ""
+        return self._policy.permits(host)
 
 
 def _results(body: bytes) -> list[SearchResult]:
