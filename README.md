@@ -139,8 +139,24 @@ uv run trading-core fixtures show
 ## Environment variables
 
 See [.env.example](.env.example); every variable read by the API, worker, web app and tooling is
-listed there with its default. Provider credentials (Databento, Alpaca, OpenAI, Tavily, FRED, EIA,
-NASS) are empty until Stage 3 and are never required for the fixture path or CI.
+listed there with its default. Leave the provider variables empty to stay on the fixture path.
+CI does that. A selected live provider with a missing credential fails visibly and does not
+invent bars, volume, or a model completion.
+
+| Variable | Unlocks |
+|---|---|
+| `DATABENTO_API_KEY` with `MARKET_DATA_FUTURES=databento` | Futures definitions, OHLCV, and trade prints (historical, not realtime) |
+| `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY` with `MARKET_DATA_EQUITIES=alpaca` | Equity and ETF bars and trades. `ALPACA_DATA_FEED=iex` (default) is an IEX-only approximation; `sip` is consolidated |
+| `MARKET_DATA_CRYPTO=coinbase` | Coinbase public spot candles and the recent trade page. No key |
+| `TAVILY_API_KEY` with `SEARCH_PROVIDER=tavily` | Web search |
+| `FRED_API_KEY` | FRED observations |
+| `EIA_API_KEY` | EIA series |
+| `USDA_NASS_API_KEY` | NASS QuickStats. WASDE report text stays a coverage gap |
+| `SEC_EDGAR_USER_AGENT` | EDGAR submissions index, rate-limited under 10 requests/second |
+| `OPENAI_API_KEY` and `OPENAI_MODEL` with `LLM_PROVIDER=openai` | OpenAI Responses. The model name is the server setting |
+
+Central-bank calendars (Fed, ECB, BoE, BoJ) are public pages fetched with the SSRF-protected
+fetcher once any research credential or `SEARCH_PROVIDER=tavily` turns live research on.
 
 ## Stage plan
 

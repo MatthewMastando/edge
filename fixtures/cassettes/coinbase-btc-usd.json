@@ -1,0 +1,102 @@
+{
+  "label": "recorded",
+  "captured_at": "2026-09-23",
+  "source": "coinbase",
+  "note": "Recorded public Coinbase Exchange responses for BTC-USD, captured 2026-09-23. Tests replay this cassette and do not call the network. Provenance must be recorded. This is not a live call.",
+  "product": {
+    "id": "BTC-USD",
+    "base_currency": "BTC",
+    "quote_currency": "USD",
+    "quote_increment": "0.01",
+    "display_name": "BTC-USD",
+    "status": "online",
+    "trading_disabled": false
+  },
+  "products": [
+    {
+      "id": "BTC-USD",
+      "base_currency": "BTC",
+      "quote_currency": "USD",
+      "quote_increment": "0.01",
+      "display_name": "BTC-USD",
+      "status": "online",
+      "trading_disabled": false
+    }
+  ],
+  "candles_5m": [
+    [
+      1790185500,
+      84242.87,
+      84332.2,
+      84242.87,
+      84312.1,
+      30.38871321
+    ],
+    [
+      1790185800,
+      84260.96,
+      84386.91,
+      84312.09,
+      84298.67,
+      62.1804799
+    ],
+    [
+      1790186100,
+      84239.11,
+      84314.63,
+      84299.68,
+      84290.21,
+      17.35831085
+    ]
+  ],
+  "candles_1h": [
+    [
+      1790164800,
+      85216.15,
+      85673.17,
+      85637.71,
+      85482.1,
+      233.76757892
+    ],
+    [
+      1790168400,
+      85261.15,
+      85878.54,
+      85482.1,
+      85783,
+      368.66691916
+    ],
+    [
+      1790172000,
+      83799.24,
+      85932.51,
+      85783,
+      84521.36,
+      1518.97523416
+    ],
+    [
+      1790175600,
+      83950,
+      84790.47,
+      84521.35,
+      83998.33,
+      538.26560065
+    ]
+  ],
+  "trades": [
+    {
+      "trade_id": 1097459340,
+      "side": "buy",
+      "size": "0.00000009",
+      "price": "84300.20000000",
+      "time": "2026-09-23T18:02:14.434272Z"
+    },
+    {
+      "trade_id": 1097459339,
+      "side": "sell",
+      "size": "0.00014633",
+      "price": "84300.21000000",
+      "time": "2026-09-23T18:02:13.450677Z"
+    }
+  ]
+}

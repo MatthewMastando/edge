@@ -99,6 +99,7 @@ def test_one_repair_drops_unmatched_prices_and_unknown_evidence() -> None:
                     "stance": "supporting",
                     "claim": "A source that was never stored.",
                     "source_id": str(uuid4()),
+                    "excerpt_id": str(uuid4()),
                     "retrieved_at": "2026-09-01T00:00:00Z",
                 }
             ],
@@ -124,6 +125,11 @@ def test_one_repair_drops_unmatched_prices_and_unknown_evidence() -> None:
         point_value=Decimal("125000"),
     )
     assert first.passed is False
+    evidence = next(check for check in first.checks if check.name == "evidence_ids_exist")
+    assert evidence.passed is False
+    assert evidence.detail is not None
+    assert "excerpt" in evidence.detail
+    assert "source" in evidence.detail
     repaired = repair_thesis(
         thesis,
         known_feature_ids=known,

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from trading_core.data.adapter import MarketDataAdapter
     from trading_core.harness.limits import ResearchLimits
     from trading_core.harness.provider import Provider
+    from trading_core.research.services import ResearchServices
     from trading_core.storage.base import ObjectStore
     from trading_core.ta import DetectorRegistry
 
@@ -86,6 +87,7 @@ class WorkflowDeps:
         owner_id: UUID | None = None,
         progress: ProgressSink | None = None,
         after_stage: AfterStage | None = None,
+        research: ResearchServices | None = None,
     ) -> None:
         self.engine = engine
         self.adapter = adapter
@@ -100,3 +102,4 @@ class WorkflowDeps:
         self.owner_id = owner_id
         self.progress = progress
         self.after_stage = after_stage
+        self.research = research

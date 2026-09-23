@@ -29,6 +29,8 @@ class SearchResult(DomainModel):
     retrieved_at: UtcDatetime
     provider: str
     provenance: Provenance
+    coverage: str | None = None
+    delay: str | None = None
 
 
 class FetchedDocument(DomainModel):
@@ -41,6 +43,9 @@ class FetchedDocument(DomainModel):
     retrieved_at: UtcDatetime
     truncated: bool = False
     provenance: Provenance
+    source: str = "fetch"
+    coverage: str = ""
+    delay: str = ""
 
 
 class SourceExcerpt(DomainModel):
@@ -54,6 +59,8 @@ class SourceExcerpt(DomainModel):
     published_at: UtcDatetime | None = None
     retrieved_at: UtcDatetime
     provenance: Provenance
+    coverage: str | None = None
+    delay: str | None = None
 
 
 @runtime_checkable

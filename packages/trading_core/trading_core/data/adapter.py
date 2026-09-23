@@ -1,4 +1,4 @@
-"""Market data adapter contract. Live adapters (Databento, Alpaca, Coinbase) land in Stage 3."""
+"""Market data adapter contract. Fixture, Databento, Alpaca, and Coinbase implement it."""
 
 from __future__ import annotations
 

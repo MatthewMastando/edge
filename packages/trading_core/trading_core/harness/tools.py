@@ -20,13 +20,15 @@ from pydantic import JsonValue
 from trading_core.data.adapter import BarsRequest, TradesRequest, UnknownSymbolError
 from trading_core.harness.provider import ToolCall, ToolResult, ToolSpec, is_forbidden_tool_name
 from trading_core.harness.secrets import redact
+from trading_core.labeling import FeedLabel, tool_feed
+from trading_core.research.hits import ResearchHit
 from trading_core.storage.db import fetch_all
 from trading_core.storage.repositories.artifacts import get_revision, list_artifacts
 from trading_core.storage.repositories.jobs import insert_tool_call
 from trading_core.storage.repositories.sources import insert_excerpt, insert_source
 
 if TYPE_CHECKING:
-    from trading_core.domain.common import Timeframe
+    from trading_core.domain.common import Provenance, Timeframe
     from trading_core.harness.budget import BudgetService
     from trading_core.harness.deps import WorkflowDeps
 
@@ -380,12 +382,86 @@ def build_research_registry(*, include_web: bool = True) -> ToolRegistry:
                 spec=_spec(
                     "list_catalysts",
                     "List fixture calendar coverage. Live calendars are not configured.",
-                    _schema({"symbol": {"type": "string", "maxLength": 32}}, ["symbol"]),
+                    _schema(
+                        {
+                            "symbol": {"type": "string", "maxLength": 32},
+                            "bank": {"type": "string", "maxLength": 8},
+                        },
+                        ["symbol"],
+                    ),
                     external=True,
                     max_calls=4,
                 ),
                 permission="research_read",
                 handler=_catalysts,
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "fetch_source_page",
+                    "Fetch one public page with SSRF protection. Counts against the retrieval cap.",
+                    _schema({"url": {"type": "string", "maxLength": 500}}, ["url"]),
+                    external=True,
+                    max_calls=4,
+                ),
+                permission="research_read",
+                handler=_fetch_page,
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "fred_series",
+                    (
+                        "Read one FRED series. A missing key is a source failure, "
+                        "not a filled-in value."
+                    ),
+                    _schema({"series_id": {"type": "string", "maxLength": 64}}, ["series_id"]),
+                    external=True,
+                    max_calls=4,
+                ),
+                permission="research_read",
+                handler=_fred,
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "sec_filings",
+                    "Read the EDGAR submissions index for a ticker. Requires a User-Agent.",
+                    _schema({"ticker": {"type": "string", "maxLength": 12}}, ["ticker"]),
+                    external=True,
+                    max_calls=4,
+                ),
+                permission="research_read",
+                handler=_sec,
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "eia_series",
+                    "Read one EIA series. A missing key is a source failure.",
+                    _schema({"series_id": {"type": "string", "maxLength": 64}}, ["series_id"]),
+                    external=True,
+                    max_calls=4,
+                ),
+                permission="research_read",
+                handler=_eia,
+            )
+        )
+        registry.register(
+            ToolDefinition(
+                spec=_spec(
+                    "nass_quickstats",
+                    "Read NASS QuickStats production for a commodity. WASDE text is not included.",
+                    _schema({"commodity": {"type": "string", "maxLength": 64}}, ["commodity"]),
+                    external=True,
+                    max_calls=4,
+                ),
+                permission="research_read",
+                handler=_nass,
             )
         )
     registry.register(
@@ -477,6 +553,7 @@ async def _bars(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonVa
         }
         for bar in series.bars[-20:]
     ]
+    feed = tool_feed(session.deps.adapter, symbol)
     return cast(
         "JsonValue",
         {
@@ -484,6 +561,9 @@ async def _bars(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonVa
             "data_revision": series.data_revision,
             "count": len(series.bars),
             "bars": bars,
+            "source": feed["source"],
+            "coverage": feed["coverage"],
+            "delay": feed["delay"],
             "note": "Limited slice. The full history is not part of the model context.",
         },
     )
@@ -493,10 +573,14 @@ async def _trades(session: ToolSession, arguments: dict[str, JsonValue]) -> Json
     symbol = _required_str(arguments, "symbol")
     batch = await session.deps.adapter.get_trades(TradesRequest(symbol=symbol, limit=1))
     last = format(batch.trades[-1].price, "f") if batch.trades else None
+    feed = tool_feed(session.deps.adapter, symbol)
     return {
         "provenance": batch.provenance,
         "trade_count_returned": len(batch.trades),
         "last_price": last,
+        "source": feed["source"],
+        "coverage": feed["coverage"],
+        "delay": feed["delay"],
         "note": "Trade tape is not copied into the model context.",
     }
 
@@ -512,6 +596,12 @@ async def _quotes(session: ToolSession, arguments: dict[str, JsonValue]) -> Json
 
 async def _search(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
     query = _required_str(arguments, "query")
+    services = session.deps.research
+    if services is not None:
+        raw_limit = arguments.get("max_results", 3)
+        limit = raw_limit if isinstance(raw_limit, int) else 3
+        hits, _external = await services.search_hits(query, max_results=limit)
+        return await _store_hits(session, hits)
     now = datetime.now(UTC)
     text = (
         f"Fixture excerpt for {query}. No live page was fetched. "
@@ -554,13 +644,141 @@ async def _search(session: ToolSession, arguments: dict[str, JsonValue]) -> Json
 
 
 async def _catalysts(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
-    del session
+    services = session.deps.research
+    if services is None:
+        return {
+            "symbol": arguments.get("symbol"),
+            "provenance": "fixture",
+            "source": "fixture",
+            "coverage": "live release calendars are not configured",
+            "delay": "not requested",
+            "catalysts": [],
+            "note": "Live release calendars are not configured.",
+        }
+    bank = arguments.get("bank")
+    choice = bank if isinstance(bank, str) and bank else "fed"
+    hit = await services.calendars.lookup(choice)
+    return await _store_hits(session, [hit])
+
+
+async def _fetch_page(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
+    services = session.deps.research
+    if services is None:
+        return _unconfigured("fetch")
+    url = _required_str(arguments, "url")
+    document = await services.fetcher.fetch(url)
+    hit = ResearchHit(
+        kind="web_page",
+        label=_feed_label(document.source, document.coverage, document.delay, "live"),
+        title=document.title or url,
+        text=document.text,
+        url=document.final_url,
+        publisher="fetch",
+        retrieved_at=document.retrieved_at,
+        external=True,
+    )
+    return await _store_hits(session, [hit])
+
+
+async def _fred(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
+    services = session.deps.research
+    if services is None:
+        return _unconfigured("fred")
+    hit = await services.fred.lookup(_required_str(arguments, "series_id"))
+    return await _store_hits(session, [hit])
+
+
+async def _sec(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
+    services = session.deps.research
+    if services is None:
+        return _unconfigured("sec_edgar")
+    hit = await services.sec.lookup(_required_str(arguments, "ticker"))
+    return await _store_hits(session, [hit])
+
+
+async def _eia(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
+    services = session.deps.research
+    if services is None:
+        return _unconfigured("eia")
+    hit = await services.eia.lookup(_required_str(arguments, "series_id"))
+    return await _store_hits(session, [hit])
+
+
+async def _nass(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
+    services = session.deps.research
+    if services is None:
+        return _unconfigured("nass")
+    hit = await services.nass.lookup(_required_str(arguments, "commodity"))
+    return await _store_hits(session, [hit])
+
+
+def _unconfigured(source: str) -> JsonValue:
     return {
-        "symbol": arguments.get("symbol"),
-        "provenance": "fixture",
-        "catalysts": [],
-        "note": "Live release calendars are not configured.",
+        "source": source,
+        "coverage": "live research is not configured",
+        "delay": "not requested",
+        "status": "missing_credential",
+        "error": f"{source} is not configured. No data was invented.",
     }
+
+
+def _feed_label(source: str, coverage: str, delay: str, provenance: str) -> FeedLabel:
+    proven: Provenance = "live"
+    if provenance == "fixture":
+        proven = "fixture"
+    elif provenance == "recorded":
+        proven = "recorded"
+    return FeedLabel(source=source, coverage=coverage, delay=delay, provenance=proven)
+
+
+async def _store_hits(session: ToolSession, hits: list[ResearchHit]) -> JsonValue:
+    results: list[dict[str, JsonValue]] = []
+    async with session.deps.engine.begin() as conn:
+        for hit in hits:
+            source_id = await insert_source(
+                conn,
+                kind=hit.kind,
+                url=hit.url,
+                title=hit.title,
+                publisher=hit.publisher,
+                published_at=hit.published_at,
+                retrieved_at=hit.retrieved_at,
+                provider=hit.label.source,
+                provenance=hit.label.provenance,
+                status=_stored_status(hit.status),
+                error=hit.error,
+            )
+            excerpt = await insert_excerpt(
+                conn,
+                source_id=source_id,
+                text=hit.labeled_text(),
+                published_at=hit.published_at,
+                retrieved_at=hit.retrieved_at,
+                provenance=hit.label.provenance,
+                kind=hit.kind,
+                url=hit.url,
+            )
+            session.source_ids.append(source_id)
+            session.excerpt_ids.append(excerpt.id)
+            results.append(
+                {
+                    "source_id": str(source_id),
+                    "excerpt_id": str(excerpt.id),
+                    "source": hit.label.source,
+                    "coverage": hit.label.coverage,
+                    "delay": hit.label.delay,
+                    "provenance": hit.label.provenance,
+                    "status": hit.status,
+                    "text": hit.labeled_text(),
+                }
+            )
+    return cast("JsonValue", {"results": results})
+
+
+def _stored_status(status: str) -> str:
+    if status in {"ok", "stale", "failed", "rate_limited"}:
+        return status
+    return "failed"
 
 
 async def _history(session: ToolSession, arguments: dict[str, JsonValue]) -> JsonValue:
