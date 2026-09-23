@@ -64,7 +64,10 @@ export function CandleChart({
         vertLines: { color: colors.grid },
         horzLines: { color: colors.grid },
       },
-      rightPriceScale: { borderColor: colors.border },
+      rightPriceScale: {
+        borderColor: colors.border,
+        scaleMargins: { top: 0.14, bottom: 0.1 },
+      },
       timeScale: { borderColor: colors.border, timeVisible: true, secondsVisible: false },
       localization: {
         timeFormatter: (time: Time) => {
