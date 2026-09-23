@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from pydantic import Field
 
-from trading_api.settings import ApiSettings, get_settings
+from trading_api.dependencies import SettingsDep
 from trading_core.domain.common import DomainModel
 
 LOCAL_DEV_USER_ID = UUID("00000000-0000-4000-8000-000000000001")
@@ -27,9 +27,7 @@ class CurrentUser(DomainModel):
     )
 
 
-def current_user(
-    request: Request, settings: Annotated[ApiSettings, Depends(get_settings)]
-) -> CurrentUser:
+def current_user(request: Request, settings: SettingsDep) -> CurrentUser:
     if settings.mode == "fixture" and not settings.supabase_jwt_secret:
         return CurrentUser(id=LOCAL_DEV_USER_ID, email=None, is_local_dev=True)
     if request.headers.get("authorization"):

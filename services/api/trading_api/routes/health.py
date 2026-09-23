@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from pydantic import Field
 
 from trading_api import __version__
-from trading_api.settings import ApiSettings, get_settings
+from trading_api.dependencies import SettingsDep
 from trading_core.data.fixture import FixtureAdapter
 from trading_core.domain.common import DomainModel
 
@@ -29,9 +29,7 @@ class HealthResponse(DomainModel):
 
 
 @router.get("/health", response_model=HealthResponse, operation_id="getHealth")
-def get_health(
-    request: Request, settings: Annotated[ApiSettings, Depends(get_settings)]
-) -> HealthResponse:
+def get_health(request: Request, settings: SettingsDep) -> HealthResponse:
     adapter: FixtureAdapter | None = getattr(request.app.state, "fixture_adapter", None)
     return HealthResponse(
         status="ok",

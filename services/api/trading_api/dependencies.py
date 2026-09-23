@@ -6,7 +6,17 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 
+from trading_api.settings import ApiSettings, get_settings
 from trading_core.data.fixture import FixtureAdapter
+
+
+def get_app_settings(request: Request) -> ApiSettings:
+    """Settings the running app was created with (falls back to the environment)."""
+    settings: ApiSettings | None = getattr(request.app.state, "settings", None)
+    return settings or get_settings()
+
+
+SettingsDep = Annotated[ApiSettings, Depends(get_app_settings)]
 
 
 def get_fixture_adapter(request: Request) -> FixtureAdapter:
